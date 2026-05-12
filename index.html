@@ -251,13 +251,28 @@ async function apiGet(id) {
   return r.json();
 }
 
-async function apiSave(id, data) {
-  const r = await fetch('/api/meeting?id=' + id, {
+async function apiCreate(id, title, mode) {
+  await fetch('/api/meeting?id=' + id, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ action: 'init', title, mode, createdAt: Date.now() }),
   });
-  if (!r.ok) throw new Error(r.status);
+}
+
+async function apiUpsert(id, pid, p) {
+  await fetch('/api/meeting?id=' + id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'upsert', pid, name: p.name, color: p.color, slots: p.slots }),
+  });
+}
+
+async function apiDeleteP(id, pid) {
+  await fetch('/api/meeting?id=' + id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'delete', pid }),
+  });
 }
 
 // ── State ──
@@ -352,7 +367,7 @@ async function createMeeting() {
   document.getElementById('joinSection').style.display = 'block';
   render();
   startPolling(id);
-  try { await apiSave(id, data); } catch(e) {}
+  try { await apiCreate(id, t, selectedMode); } catch(e) {}
   toast('약속 생성 완료! 링크를 복사해 친구들에게 공유하세요 🎉');
 }
 
@@ -377,7 +392,7 @@ async function joinMeeting() {
   render();
   toast(`${name}으로 참여했습니다! 달력에서 일정을 선택하세요 📅`);
 
-  try { isSaving = true; await apiSave(meetingId, liveData); } catch(e) {} finally { isSaving = false; }
+  try { isSaving = true; await apiUpsert(meetingId, pid, { name, color, slots: {} }); } catch(e) {} finally { isSaving = false; }
 }
 
 // ── 일정 토글 ──
@@ -392,7 +407,7 @@ async function toggleSlot(ds, period) {
   else delete me.slots[ds];
   render();
 
-  try { isSaving = true; await apiSave(meetingId, liveData); } catch(e) {} finally { isSaving = false; }
+  try { isSaving = true; await apiUpsert(meetingId, myPid, liveData.participants[myPid]); } catch(e) {} finally { isSaving = false; }
 }
 
 async function toggleDate(ds) {
@@ -405,7 +420,7 @@ async function toggleDate(ds) {
   if (!has) me.slots[ds] = next; else delete me.slots[ds];
   render();
 
-  try { isSaving = true; await apiSave(meetingId, liveData); } catch(e) {} finally { isSaving = false; }
+  try { isSaving = true; await apiUpsert(meetingId, myPid, liveData.participants[myPid]); } catch(e) {} finally { isSaving = false; }
 }
 
 // ── 참여자 삭제 (관리자) ──
@@ -416,7 +431,7 @@ async function deleteParticipant(pid) {
   if (myPid === pid) { myPid = null; localStorage.removeItem('yaksok_pid_' + meetingId); }
   render();
 
-  try { isSaving = true; await apiSave(meetingId, liveData); } catch(e) {} finally { isSaving = false; }
+  try { isSaving = true; await apiDeleteP(meetingId, pid); } catch(e) {} finally { isSaving = false; }
 }
 
 // ── 약속 삭제 (관리자, 홈에서) ──
