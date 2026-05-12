@@ -166,8 +166,8 @@
       <div class="field">
         <label>조사 방식</label>
         <div class="mode-toggle">
-          <button class="mode-btn active" id="modeSlot" onclick="setMode('slot')">🍽️ 점심 / 저녁</button>
-          <button class="mode-btn" id="modeDate" onclick="setMode('date')">📆 날짜만</button>
+          <button class="mode-btn" id="modeSlot" onclick="setMode('slot')">🍽️ 점심 / 저녁</button>
+          <button class="mode-btn active" id="modeDate" onclick="setMode('date')">📆 날짜만</button>
         </div>
       </div>
       <div class="create-row">
@@ -264,7 +264,7 @@ let meetingId   = null;
 let selectedPid = null;   // 현재 편집 중인 참여자
 let vy = new Date().getFullYear();
 let vm = new Date().getMonth();
-let selectedMode = 'slot';
+let selectedMode = 'date';
 
 const COLORS = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#C39BD3','#A29BFE','#FDCB6E','#00B894','#E17055','#74B9FF'];
 const DAYS   = ['일','월','화','수','목','금','토'];
