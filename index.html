@@ -289,11 +289,12 @@ function goHome() {
 async function goMeeting(id) {
   meetingId   = id;
   selectedPid = null;
-  liveData    = { title: '로딩 중...', mode: 'slot', participants: {} };
+  const local = getAdminMeetings().find(m => m.id === id);
+  liveData    = { title: local?.title || '', mode: local?.mode || 'date', participants: {} };
   history.replaceState(null, '', '#m/' + id);
   showScreen('sMeeting');
   document.getElementById('backBtn').style.display = 'inline-block';
-  document.getElementById('topTitle').textContent  = '로딩 중...';
+  document.getElementById('topTitle').textContent  = liveData.title || '로딩 중...';
   render();
   try {
     const data = await apiGet(id);
