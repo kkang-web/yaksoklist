@@ -539,7 +539,7 @@ function setMode(mode) {
 function toggleCreateForm(show) {
   document.getElementById('createForm').style.display    = show ? 'block' : 'none';
   document.getElementById('newMeetingBtn').style.display = show ? 'none'  : 'block';
-  if (show) { setMode('slot'); document.getElementById('mtitle').focus(); }
+  if (show) { setMode('date'); document.getElementById('mtitle').focus(); }
 }
 function heatClass(cnt, total) {
   if (!cnt) return '';
