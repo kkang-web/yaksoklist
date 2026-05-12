@@ -1,15 +1,10 @@
-const { put, list } = require('@vercel/blob');
+const BLOB = 'https://jsonblob.com/api/jsonBlob';
 
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    req.on('data', c => chunks.push(c));
-    req.on('end', () => {
-      try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
-      catch (e) { reject(e); }
-    });
-    req.on('error', reject);
-  });
+async function readBody(req) {
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  await new Promise(r => req.on('end', r));
+  return JSON.parse(Buffer.concat(chunks).toString());
 }
 
 module.exports = async function handler(req, res) {
@@ -19,30 +14,39 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const { id } = req.query;
-  if (!id) return res.status(400).json({ error: 'Missing id' });
-  const pathname = `meeting-${id}.json`;
 
-  try {
-    if (req.method === 'GET') {
-      const { blobs } = await list({ prefix: pathname, limit: 1 });
-      if (!blobs.length) return res.status(200).json(null);
-      const r = await fetch(blobs[0].url + '?t=' + Date.now());
-      return res.status(200).json(await r.json());
-    }
-
-    if (req.method === 'POST') {
-      const body = await readBody(req);
-      await put(pathname, JSON.stringify(body), {
-        access: 'public',
-        contentType: 'application/json',
-        addRandomSuffix: false,
-        cacheControlMaxAge: 0,
-      });
-      return res.status(200).json({ ok: true });
-    }
-
-    return res.status(405).json({ error: 'Method not allowed' });
-  } catch (e) {
-    return res.status(500).json({ error: e.message });
+  if (req.method === 'GET') {
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const r = await fetch(`${BLOB}/${id}`, { headers: { Accept: 'application/json' } });
+    if (!r.ok) return res.status(200).json(null);
+    return res.status(200).json(await r.json());
   }
+
+  if (req.method === 'POST') {
+    const body = await readBody(req);
+    if (id) {
+      // Update existing blob
+      const r = await fetch(`${BLOB}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) return res.status(r.status).json({ error: 'update failed' });
+      return res.status(200).json({ ok: true, id });
+    } else {
+      // Create new blob
+      const r = await fetch(BLOB, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) return res.status(r.status).json({ error: 'create failed' });
+      const loc = r.headers.get('Location') || '';
+      const blobId = loc.split('/').pop();
+      if (!blobId) return res.status(500).json({ error: 'no blob id' });
+      return res.status(201).json({ ok: true, id: blobId });
+    }
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 };

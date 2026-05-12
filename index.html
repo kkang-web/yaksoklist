@@ -190,9 +190,6 @@
 
 <!-- Meeting (관리자 + 참여자 공통) -->
 <div id="sMeeting" class="screen">
-  <div id="viewBanner" style="display:none;background:#FFFBEB;color:#92400E;padding:10px 24px;font-size:13px;font-weight:600;text-align:center;border-bottom:1px solid #FCD34D;">
-    👁️ 공유된 약속 보기 — 관리자만 수정할 수 있어요
-  </div>
   <div class="top-bar">
     <div class="top-title">
       <button class="btn-back" id="backBtn">← 목록</button>
@@ -255,6 +252,11 @@ function genId() { return Math.random().toString(36).slice(2, 10); }
 
 function saveMeetingData(id, data) {
   localStorage.setItem('yaksok_data_' + id, JSON.stringify(data));
+  fetch('/api/meeting?id=' + id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(() => {});
 }
 
 function localMeetingData(id) {
@@ -262,25 +264,10 @@ function localMeetingData(id) {
   catch(_) { return null; }
 }
 
-// ── URL 인코딩 (크로스디바이스 공유) ──
-function encodeData(data) {
-  const bytes = new TextEncoder().encode(JSON.stringify(data));
-  let bin = '';
-  bytes.forEach(b => bin += String.fromCharCode(b));
-  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-}
-function decodeData(enc) {
-  const bin = atob(enc.replace(/-/g,'+').replace(/_/g,'/'));
-  const bytes = new Uint8Array(bin.length);
-  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
-  return JSON.parse(new TextDecoder().decode(bytes));
-}
-
 // ── State ──
 let liveData    = { title: '', mode: 'slot', participants: {} };
 let meetingId   = null;
 let selectedPid = null;
-let isViewOnly  = false;
 let vy = new Date().getFullYear();
 let vm = new Date().getMonth();
 let selectedMode = 'date';
@@ -297,7 +284,7 @@ function removeAdminMeeting(id) { localStorage.setItem('yaksok_admin_v2', JSON.s
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); document.getElementById(id).classList.add('on'); }
 
 function goHome() {
-  meetingId = null; selectedPid = null; isViewOnly = false;
+  meetingId = null; selectedPid = null;
   liveData = { title: '', mode: 'slot', participants: {} };
   history.replaceState(null, '', location.pathname);
   toggleCreateForm(false);
@@ -305,51 +292,55 @@ function goHome() {
   renderMeetingList();
 }
 
-function goMeeting(id) {
+async function goMeeting(id) {
   meetingId   = id;
   selectedPid = null;
-  isViewOnly  = false;
   const cached = localMeetingData(id);
   const local  = getAdminMeetings().find(m => m.id === id);
   liveData = cached || { title: local?.title || '', mode: local?.mode || 'date', participants: {} };
   history.replaceState(null, '', '#m/' + id);
   showScreen('sMeeting');
-  document.getElementById('backBtn').style.display    = 'inline-block';
-  document.getElementById('editTitleBtn').style.display = '';
-  document.getElementById('shareBtn').style.display   = '';
-  document.getElementById('joinSection').style.display = '';
-  document.getElementById('viewBanner').style.display = 'none';
-  document.getElementById('topTitle').textContent     = liveData.title;
+  document.getElementById('backBtn').style.display = 'inline-block';
+  document.getElementById('topTitle').textContent  = liveData.title;
   render();
-}
-
-function goSharedView(encoded) {
   try {
-    const data = decodeData(encoded);
-    isViewOnly  = true;
-    liveData    = data;
-    meetingId   = null;
-    selectedPid = null;
-    showScreen('sMeeting');
-    document.getElementById('topTitle').textContent      = data.title;
-    document.getElementById('backBtn').style.display     = 'none';
-    document.getElementById('editTitleBtn').style.display = 'none';
-    document.getElementById('shareBtn').style.display    = 'none';
-    document.getElementById('joinSection').style.display = 'none';
-    document.getElementById('ptip').style.display        = 'none';
-    document.getElementById('viewBanner').style.display  = 'block';
-    render();
-  } catch(e) { goHome(); }
+    const r = await fetch('/api/meeting?id=' + id);
+    if (r.ok) {
+      const data = await r.json();
+      if (data && meetingId === id) {
+        liveData = data;
+        localStorage.setItem('yaksok_data_' + id, JSON.stringify(data));
+        document.getElementById('topTitle').textContent = data.title;
+        render();
+      }
+    }
+  } catch(e) {}
 }
 
 // ── 약속 생성 ──
-function createMeeting() {
+async function createMeeting() {
   const t = document.getElementById('mtitle').value.trim();
   if (!t) { document.getElementById('mtitle').focus(); return; }
-  const id   = genId();
+
+  const btn = document.getElementById('createBtn');
+  btn.textContent = '만드는 중...'; btn.disabled = true;
+
   const data = { title: t, mode: selectedMode, createdAt: Date.now(), participants: {} };
+  let id;
+  try {
+    const r = await fetch('/api/meeting', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (r.ok || r.status === 201) { const j = await r.json(); id = j.id; }
+  } catch(e) {}
+
+  btn.textContent = '만들기 →'; btn.disabled = false;
+  if (!id) { toast('오류: 약속 생성에 실패했습니다. 잠시 후 다시 시도하세요'); return; }
+
   addAdminMeeting({ id, title: t, mode: selectedMode, createdAt: Date.now() });
-  saveMeetingData(id, data);
+  localStorage.setItem('yaksok_data_' + id, JSON.stringify(data));
   toggleCreateForm(false);
   document.getElementById('mtitle').value = '';
   meetingId = id; selectedPid = null; liveData = data;
@@ -425,7 +416,6 @@ function selectParticipant(pid) {
 
 // ── 일정 토글 ──
 function toggleSlot(ds, period) {
-  if (isViewOnly) return;
   if (!selectedPid) { toast('왼쪽 목록에서 참여자를 선택하세요'); return; }
   const me = liveData.participants[selectedPid];
   if (!me) return;
@@ -439,7 +429,6 @@ function toggleSlot(ds, period) {
 }
 
 function toggleDate(ds) {
-  if (isViewOnly) return;
   if (!selectedPid) { toast('왼쪽 목록에서 참여자를 선택하세요'); return; }
   const me = liveData.participants[selectedPid];
   if (!me) return;
@@ -487,13 +476,11 @@ function renderP() {
   el.innerHTML = parts.map(([pid, p]) => {
     const isSel = pid === selectedPid;
     const slots = Object.keys(p.slots || {}).length;
-    const onclick = isViewOnly ? '' : `onclick="selectParticipant('${pid}')"`;
-    const delBtn  = isViewOnly ? '' : `<button class="p-del-btn" onclick="event.stopPropagation();deleteParticipant('${pid}')">✕</button>`;
-    return `<div class="p-item${isSel ? ' active' : ''}" ${onclick} style="cursor:${isViewOnly?'default':'pointer'}">
+    return `<div class="p-item${isSel ? ' active' : ''}" onclick="selectParticipant('${pid}')" style="cursor:pointer">
       <div class="p-dot" style="background:${p.color}"></div>
       <div class="p-name">${esc(p.name)}</div>
       <div class="p-cnt">${slots}일</div>
-      ${delBtn}
+      <button class="p-del-btn" onclick="event.stopPropagation();deleteParticipant('${pid}')">✕</button>
     </div>`;
   }).join('');
 }
@@ -631,10 +618,9 @@ function fmt(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getD
 function changeMonth(d) { vm+=d; if(vm>11){vm=0;vy++;}if(vm<0){vm=11;vy--;} renderCal(); }
 
 function copyShareLink() {
-  const encoded = encodeData(liveData);
-  const url = location.href.split('#')[0] + '#s/' + encoded;
+  const url = location.href.split('#')[0] + '#m/' + meetingId;
   navigator.clipboard?.writeText(url)
-    .then(()=>toast('링크 복사 완료! 수정 후엔 새 링크를 복사하세요'))
+    .then(()=>toast('링크 복사 완료!'))
     .catch(()=>{ const t=Object.assign(document.createElement('textarea'),{value:url}); t.style.cssText='position:fixed;opacity:0'; document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t); toast('링크 복사 완료!'); });
 }
 function toast(msg) {
@@ -656,8 +642,7 @@ document.getElementById('joinName').addEventListener('keydown', e=>{ if(e.key===
 // ── Init ──
 (function() {
   const hash = location.hash.slice(1);
-  if (hash.startsWith('s/')) goSharedView(hash.slice(2));
-  else if (hash.startsWith('m/')) goMeeting(hash.slice(2));
+  if (hash.startsWith('m/')) goMeeting(hash.slice(2));
   else goHome();
 })();
 </script>
