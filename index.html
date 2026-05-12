@@ -192,7 +192,6 @@
       <button class="btn-back" id="backBtn">← 목록</button>
       <span>📅</span>
       <span id="topTitle">로딩 중...</span>
-      <span class="live-dot" title="실시간 동기화 중"></span>
     </div>
     <div class="top-bar-right">
       <button class="btn-share" id="shareBtn">🔗 링크 복사</button>
@@ -204,10 +203,10 @@
       <div class="card-title">👥 참여자</div>
       <div id="joinSection">
         <div class="p-row">
-          <input id="joinName" type="text" placeholder="내 이름 입력" maxlength="20" autocomplete="off">
-          <button class="btn-add" id="joinBtn">참여</button>
+          <input id="joinName" type="text" placeholder="참여자 이름" maxlength="20" autocomplete="off">
+          <button class="btn-add" id="joinBtn">추가</button>
         </div>
-        <div class="tip" style="margin-top:0">👆 이름을 입력하면 달력에서 내 일정을 선택할 수 있어요</div>
+        <div class="tip" style="margin-top:0">👆 이름 추가 후 목록에서 클릭해 선택 → 달력에서 일정 입력</div>
       </div>
       <div id="plist" class="p-list"></div>
       <div id="ptip" class="tip" style="display:none">✏️ 달력에서 클릭해 내 일정을 선택/해제하세요</div>
@@ -242,7 +241,7 @@
 <div id="toast"></div>
 
 <script>
-// ── API (Vercel Blob + 서버리스) ──
+// ── API ──
 function genId() { return Math.random().toString(36).slice(2, 10); }
 
 async function apiGet(id) {
@@ -251,80 +250,35 @@ async function apiGet(id) {
   return r.json();
 }
 
-async function apiCreate(id, title, mode) {
+async function apiSave(id, data) {
   await fetch('/api/meeting?id=' + id, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'init', title, mode, createdAt: Date.now() }),
-  });
-}
-
-async function apiUpsert(id, pid, p) {
-  await fetch('/api/meeting?id=' + id, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'upsert', pid, name: p.name, color: p.color, slots: p.slots }),
-  });
-}
-
-async function apiDeleteP(id, pid) {
-  await fetch('/api/meeting?id=' + id, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'delete', pid }),
+    body: JSON.stringify(data),
   });
 }
 
 // ── State ──
 let liveData    = { title: '', mode: 'slot', participants: {} };
 let meetingId   = null;
-let myPid       = null;
-let isAdminUser = false;
+let selectedPid = null;   // 현재 편집 중인 참여자
 let vy = new Date().getFullYear();
 let vm = new Date().getMonth();
 let selectedMode = 'slot';
-let renderTimer  = null;
-let pollInterval = null;
-let isSaving     = false;
 
 const COLORS = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#C39BD3','#A29BFE','#FDCB6E','#00B894','#E17055','#74B9FF'];
 const DAYS   = ['일','월','화','수','목','금','토'];
 
-// ── LocalStorage ──
+// ── LocalStorage (약속 목록) ──
 function getAdminMeetings() { try { return JSON.parse(localStorage.getItem('yaksok_admin_v2')) || []; } catch(_) { return []; } }
 function addAdminMeeting(m) { const l = getAdminMeetings().filter(x => x.id !== m.id); l.unshift(m); localStorage.setItem('yaksok_admin_v2', JSON.stringify(l)); }
 function removeAdminMeeting(id) { localStorage.setItem('yaksok_admin_v2', JSON.stringify(getAdminMeetings().filter(x => x.id !== id))); }
-function getMyPid(mid) { return localStorage.getItem('yaksok_pid_' + mid); }
-function setMyPid(mid, pid) { localStorage.setItem('yaksok_pid_' + mid, pid); }
 
 // ── Screen ──
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); document.getElementById(id).classList.add('on'); }
-function schedRender() { clearTimeout(renderTimer); renderTimer = setTimeout(render, 80); }
 
-// ── Polling (3초마다 서버에서 최신 데이터 수신) ──
-function startPolling(id) {
-  stopPolling();
-  pollInterval = setInterval(async () => {
-    if (isSaving) return;
-    try {
-      const data = await apiGet(id);
-      if (data && meetingId === id) {
-        liveData = data;
-        document.getElementById('topTitle').textContent = data.title;
-        render();
-      }
-    } catch(e) {}
-  }, 3000);
-}
-
-function stopPolling() {
-  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-}
-
-// ── Navigation ──
 function goHome() {
-  stopPolling();
-  meetingId = null; myPid = null; isAdminUser = false;
+  meetingId = null; selectedPid = null;
   liveData = { title: '', mode: 'slot', participants: {} };
   history.replaceState(null, '', location.pathname);
   toggleCreateForm(false);
@@ -334,23 +288,20 @@ function goHome() {
 
 async function goMeeting(id) {
   meetingId   = id;
-  isAdminUser = getAdminMeetings().some(m => m.id === id);
-  myPid       = getMyPid(id);
+  selectedPid = null;
   liveData    = { title: '로딩 중...', mode: 'slot', participants: {} };
   history.replaceState(null, '', '#m/' + id);
   showScreen('sMeeting');
-  document.getElementById('backBtn').style.display   = isAdminUser ? 'inline-block' : 'none';
-  document.getElementById('topTitle').textContent    = '로딩 중...';
-  document.getElementById('joinSection').style.display = myPid ? 'none' : 'block';
+  document.getElementById('backBtn').style.display = 'inline-block';
+  document.getElementById('topTitle').textContent  = '로딩 중...';
   render();
   try {
     const data = await apiGet(id);
     if (data) { liveData = data; document.getElementById('topTitle').textContent = data.title; render(); }
   } catch(e) {}
-  startPolling(id);
 }
 
-// ── 약속 생성 (관리자) ──
+// ── 약속 생성 ──
 async function createMeeting() {
   const t = document.getElementById('mtitle').value.trim();
   if (!t) { document.getElementById('mtitle').focus(); return; }
@@ -359,27 +310,26 @@ async function createMeeting() {
   addAdminMeeting({ id, title: t, mode: selectedMode, createdAt: Date.now() });
   toggleCreateForm(false);
   document.getElementById('mtitle').value = '';
-  meetingId = id; isAdminUser = true; myPid = null; liveData = data;
+  meetingId = id; selectedPid = null; liveData = data;
   history.replaceState(null, '', '#m/' + id);
   showScreen('sMeeting');
   document.getElementById('backBtn').style.display = 'inline-block';
   document.getElementById('topTitle').textContent  = t;
-  document.getElementById('joinSection').style.display = 'block';
   render();
-  startPolling(id);
-  try { await apiCreate(id, t, selectedMode); } catch(e) {}
-  toast('약속 생성 완료! 링크를 복사해 친구들에게 공유하세요 🎉');
+  try { await apiSave(id, data); } catch(e) {}
+  toast('약속 생성 완료!');
 }
 
-// ── 참여 (이름 입력) ──
-async function joinMeeting() {
+// ── 참여자 추가 ──
+async function addParticipant() {
   const name = document.getElementById('joinName').value.trim();
   if (!name) { document.getElementById('joinName').focus(); return; }
 
   const existing = Object.entries(liveData.participants).find(([, p]) => p.name === name);
   if (existing) {
-    myPid = existing[0]; setMyPid(meetingId, myPid);
-    toast(`${name}으로 재접속했습니다`); render(); return;
+    selectedPid = existing[0];
+    document.getElementById('joinName').value = '';
+    render(); return;
   }
 
   const used  = Object.values(liveData.participants).map(p => p.color);
@@ -387,18 +337,23 @@ async function joinMeeting() {
   const pid   = genId();
 
   liveData.participants[pid] = { name, color, slots: {} };
-  myPid = pid; setMyPid(meetingId, pid);
+  selectedPid = pid;
   document.getElementById('joinName').value = '';
   render();
-  toast(`${name}으로 참여했습니다! 달력에서 일정을 선택하세요 📅`);
+  toast(`${name} 추가됨 — 달력에서 일정을 선택하세요`);
+  try { await apiSave(meetingId, liveData); } catch(e) {}
+}
 
-  try { isSaving = true; await apiUpsert(meetingId, pid, { name, color, slots: {} }); } catch(e) {} finally { isSaving = false; }
+// ── 참여자 선택 (클릭으로 전환) ──
+function selectParticipant(pid) {
+  selectedPid = pid;
+  render();
 }
 
 // ── 일정 토글 ──
 async function toggleSlot(ds, period) {
-  if (!myPid) { toast('먼저 이름을 입력해 참여하세요'); return; }
-  const me = liveData.participants[myPid];
+  if (!selectedPid) { toast('왼쪽 목록에서 참여자를 선택하세요'); return; }
+  const me = liveData.participants[selectedPid];
   if (!me) return;
   const cur  = me.slots[ds] || { am: false, pm: false };
   const next = { ...cur, [period]: !cur[period] };
@@ -406,35 +361,32 @@ async function toggleSlot(ds, period) {
   if (next.am || next.pm) me.slots[ds] = next;
   else delete me.slots[ds];
   render();
-
-  try { isSaving = true; await apiUpsert(meetingId, myPid, liveData.participants[myPid]); } catch(e) {} finally { isSaving = false; }
+  try { await apiSave(meetingId, liveData); } catch(e) {}
 }
 
 async function toggleDate(ds) {
-  if (!myPid) { toast('먼저 이름을 입력해 참여하세요'); return; }
-  const me = liveData.participants[myPid];
+  if (!selectedPid) { toast('왼쪽 목록에서 참여자를 선택하세요'); return; }
+  const me = liveData.participants[selectedPid];
   if (!me) return;
   const has  = me.slots[ds] && (me.slots[ds].am || me.slots[ds].pm);
   const next = has ? { am: false, pm: false } : { am: true, pm: true };
 
   if (!has) me.slots[ds] = next; else delete me.slots[ds];
   render();
-
-  try { isSaving = true; await apiUpsert(meetingId, myPid, liveData.participants[myPid]); } catch(e) {} finally { isSaving = false; }
+  try { await apiSave(meetingId, liveData); } catch(e) {}
 }
 
-// ── 참여자 삭제 (관리자) ──
+// ── 참여자 삭제 ──
 async function deleteParticipant(pid) {
   const p = liveData.participants[pid];
   if (!p || !confirm(`"${p.name}"을(를) 삭제할까요?`)) return;
   delete liveData.participants[pid];
-  if (myPid === pid) { myPid = null; localStorage.removeItem('yaksok_pid_' + meetingId); }
+  if (selectedPid === pid) selectedPid = null;
   render();
-
-  try { isSaving = true; await apiDeleteP(meetingId, pid); } catch(e) {} finally { isSaving = false; }
+  try { await apiSave(meetingId, liveData); } catch(e) {}
 }
 
-// ── 약속 삭제 (관리자, 홈에서) ──
+// ── 약속 삭제 (홈에서) ──
 function deleteMeeting(id, e) {
   e.stopPropagation();
   const m = getAdminMeetings().find(x => x.id === id);
@@ -445,10 +397,10 @@ function deleteMeeting(id, e) {
 
 // ── Render ──
 function render() {
-  const me = myPid && liveData.participants[myPid];
-  document.getElementById('joinSection').style.display = me ? 'none' : 'block';
-  document.getElementById('ptip').style.display        = me ? 'block' : 'none';
-  if (!me && myPid) myPid = null;
+  const sel = selectedPid && liveData.participants[selectedPid];
+  const ptip = document.getElementById('ptip');
+  ptip.style.display = sel ? 'block' : 'none';
+  if (sel) ptip.textContent = `✏️ ${sel.name}의 일정 편집 중`;
   renderP(); renderCal(); renderBest();
 }
 
@@ -457,13 +409,13 @@ function renderP() {
   const el    = document.getElementById('plist');
   if (!parts.length) { el.innerHTML = '<div class="empty-msg"><span class="ei">👋</span>아직 참여자가 없어요</div>'; return; }
   el.innerHTML = parts.map(([pid, p]) => {
-    const isMe  = pid === myPid;
+    const isSel = pid === selectedPid;
     const slots = Object.keys(p.slots || {}).length;
-    return `<div class="p-item${isMe ? ' active' : ''}">
+    return `<div class="p-item${isSel ? ' active' : ''}" onclick="selectParticipant('${pid}')" style="cursor:pointer">
       <div class="p-dot" style="background:${p.color}"></div>
-      <div class="p-name">${esc(p.name)}${isMe ? ' <span style="font-size:11px;opacity:.65">(나)</span>' : ''}</div>
+      <div class="p-name">${esc(p.name)}</div>
       <div class="p-cnt">${slots}일</div>
-      ${isAdminUser && !isMe ? `<button class="p-del-btn" onclick="deleteParticipant('${pid}')">✕</button>` : ''}
+      <button class="p-del-btn" onclick="event.stopPropagation();deleteParticipant('${pid}')">✕</button>
     </div>`;
   }).join('');
 }
@@ -475,7 +427,7 @@ function renderCal() {
   const todayStr = fmt(new Date());
   const parts    = Object.entries(liveData.participants);
   const total    = parts.length;
-  const me       = myPid ? liveData.participants[myPid] : null;
+  const me       = selectedPid ? liveData.participants[selectedPid] : null;
 
   let html = '';
   for (let i = 0; i < first; i++) html += '<div class="day blank"></div>';
@@ -520,7 +472,7 @@ function renderCal() {
 function renderBest() {
   const el    = document.getElementById('bestList');
   const parts = Object.entries(liveData.participants);
-  if (!parts.length) { el.innerHTML = '<div class="empty-msg"><span class="ei">📊</span>참여자를 기다리는 중...</div>'; return; }
+  if (!parts.length) { el.innerHTML = '<div class="empty-msg"><span class="ei">📊</span>참여자를 추가해주세요</div>'; return; }
 
   const map = new Map();
   parts.forEach(([, p]) => {
@@ -603,7 +555,7 @@ function changeMonth(d) { vm+=d; if(vm>11){vm=0;vy++;}if(vm<0){vm=11;vy--;} rend
 function copyShareLink() {
   const url = location.href.split('#')[0] + '#m/' + meetingId;
   navigator.clipboard?.writeText(url)
-    .then(()=>toast('링크 복사 완료! 친구들에게 공유하세요 🎉'))
+    .then(()=>toast('링크 복사 완료!'))
     .catch(()=>{ const t=Object.assign(document.createElement('textarea'),{value:url}); t.style.cssText='position:fixed;opacity:0'; document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t); toast('링크 복사 완료!'); });
 }
 function toast(msg) {
@@ -616,11 +568,11 @@ function toast(msg) {
 document.getElementById('createBtn').addEventListener('click', createMeeting);
 document.getElementById('shareBtn').addEventListener('click', copyShareLink);
 document.getElementById('backBtn').addEventListener('click', goHome);
-document.getElementById('joinBtn').addEventListener('click', joinMeeting);
+document.getElementById('joinBtn').addEventListener('click', addParticipant);
 document.getElementById('prevM').addEventListener('click', ()=>changeMonth(-1));
 document.getElementById('nextM').addEventListener('click', ()=>changeMonth(1));
 document.getElementById('mtitle').addEventListener('keydown', e=>{ if(e.key==='Enter') createMeeting(); });
-document.getElementById('joinName').addEventListener('keydown', e=>{ if(e.key==='Enter') joinMeeting(); });
+document.getElementById('joinName').addEventListener('keydown', e=>{ if(e.key==='Enter') addParticipant(); });
 
 // ── Init ──
 (function() {
