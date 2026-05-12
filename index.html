@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>약속잡기</title>
-  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -243,13 +242,23 @@
 <div id="toast"></div>
 
 <script>
-// ── Gun.js 실시간 DB (계정 불필요, 무료 공개 릴레이 사용) ──
-const gun = Gun([
-  'https://peer.wallie.io/gun',
-  'https://relay.peer.ooo/gun',
-]);
-function gMeet(id) { return gun.get('yaksok_v1').get(id); }
-function genId()  { return Math.random().toString(36).slice(2, 10); }
+// ── API (Vercel Blob + 서버리스) ──
+function genId() { return Math.random().toString(36).slice(2, 10); }
+
+async function apiGet(id) {
+  const r = await fetch('/api/meeting?id=' + id);
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+async function apiSave(id, data) {
+  const r = await fetch('/api/meeting?id=' + id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) throw new Error(r.status);
+}
 
 // ── State ──
 let liveData    = { title: '', mode: 'slot', participants: {} };
@@ -260,11 +269,13 @@ let vy = new Date().getFullYear();
 let vm = new Date().getMonth();
 let selectedMode = 'slot';
 let renderTimer  = null;
+let pollInterval = null;
+let isSaving     = false;
 
 const COLORS = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#C39BD3','#A29BFE','#FDCB6E','#00B894','#E17055','#74B9FF'];
 const DAYS   = ['일','월','화','수','목','금','토'];
 
-// ── LocalStorage (관리자 목록 & 내 참여자ID) ──
+// ── LocalStorage ──
 function getAdminMeetings() { try { return JSON.parse(localStorage.getItem('yaksok_admin_v2')) || []; } catch(_) { return []; } }
 function addAdminMeeting(m) { const l = getAdminMeetings().filter(x => x.id !== m.id); l.unshift(m); localStorage.setItem('yaksok_admin_v2', JSON.stringify(l)); }
 function removeAdminMeeting(id) { localStorage.setItem('yaksok_admin_v2', JSON.stringify(getAdminMeetings().filter(x => x.id !== id))); }
@@ -273,10 +284,31 @@ function setMyPid(mid, pid) { localStorage.setItem('yaksok_pid_' + mid, pid); }
 
 // ── Screen ──
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); document.getElementById(id).classList.add('on'); }
-
 function schedRender() { clearTimeout(renderTimer); renderTimer = setTimeout(render, 80); }
 
+// ── Polling (3초마다 서버에서 최신 데이터 수신) ──
+function startPolling(id) {
+  stopPolling();
+  pollInterval = setInterval(async () => {
+    if (isSaving) return;
+    try {
+      const data = await apiGet(id);
+      if (data && meetingId === id) {
+        liveData = data;
+        document.getElementById('topTitle').textContent = data.title;
+        render();
+      }
+    } catch(e) {}
+  }, 3000);
+}
+
+function stopPolling() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+}
+
+// ── Navigation ──
 function goHome() {
+  stopPolling();
   meetingId = null; myPid = null; isAdminUser = false;
   liveData = { title: '', mode: 'slot', participants: {} };
   history.replaceState(null, '', location.pathname);
@@ -285,7 +317,7 @@ function goHome() {
   renderMeetingList();
 }
 
-function goMeeting(id) {
+async function goMeeting(id) {
   meetingId   = id;
   isAdminUser = getAdminMeetings().some(m => m.id === id);
   myPid       = getMyPid(id);
@@ -295,55 +327,37 @@ function goMeeting(id) {
   document.getElementById('backBtn').style.display   = isAdminUser ? 'inline-block' : 'none';
   document.getElementById('topTitle').textContent    = '로딩 중...';
   document.getElementById('joinSection').style.display = myPid ? 'none' : 'block';
-  subscribeMeeting(id);
-}
-
-// ── Gun.js 실시간 구독 ──
-function subscribeMeeting(id) {
-  const m = gMeet(id);
-
-  m.get('title').on(v => { if (typeof v === 'string' && v) { liveData.title = v; document.getElementById('topTitle').textContent = v; }});
-  m.get('mode').on(v  => { if (typeof v === 'string' && v) liveData.mode = v; });
-
-  m.get('participants').map().on(function(pData, pid) {
-    if (!pData || typeof pData !== 'object' || pData.deleted || !pData.name) {
-      if (liveData.participants[pid]) { delete liveData.participants[pid]; schedRender(); }
-      return;
-    }
-    if (!liveData.participants[pid]) {
-      liveData.participants[pid] = { name: '', color: '', slots: {} };
-      // 슬롯 구독
-      m.get('participants').get(pid).get('slots').map().on(function(slotData, ds) {
-        if (!liveData.participants[pid]) return;
-        if (!slotData || typeof slotData !== 'object' || (!slotData.am && !slotData.pm)) {
-          delete liveData.participants[pid].slots[ds];
-        } else {
-          liveData.participants[pid].slots[ds] = { am: !!slotData.am, pm: !!slotData.pm };
-        }
-        schedRender();
-      });
-    }
-    if (pData.name)  liveData.participants[pid].name  = pData.name;
-    if (pData.color) liveData.participants[pid].color = pData.color;
-    schedRender();
-  });
+  render();
+  try {
+    const data = await apiGet(id);
+    if (data) { liveData = data; document.getElementById('topTitle').textContent = data.title; render(); }
+  } catch(e) {}
+  startPolling(id);
 }
 
 // ── 약속 생성 (관리자) ──
-function createMeeting() {
+async function createMeeting() {
   const t = document.getElementById('mtitle').value.trim();
   if (!t) { document.getElementById('mtitle').focus(); return; }
-  const id = genId();
-  gMeet(id).put({ title: t, mode: selectedMode, createdAt: Date.now() });
+  const id   = genId();
+  const data = { title: t, mode: selectedMode, createdAt: Date.now(), participants: {} };
   addAdminMeeting({ id, title: t, mode: selectedMode, createdAt: Date.now() });
   toggleCreateForm(false);
   document.getElementById('mtitle').value = '';
-  goMeeting(id);
+  meetingId = id; isAdminUser = true; myPid = null; liveData = data;
+  history.replaceState(null, '', '#m/' + id);
+  showScreen('sMeeting');
+  document.getElementById('backBtn').style.display = 'inline-block';
+  document.getElementById('topTitle').textContent  = t;
+  document.getElementById('joinSection').style.display = 'block';
+  render();
+  startPolling(id);
+  try { await apiSave(id, data); } catch(e) {}
   toast('약속 생성 완료! 링크를 복사해 친구들에게 공유하세요 🎉');
 }
 
 // ── 참여 (이름 입력) ──
-function joinMeeting() {
+async function joinMeeting() {
   const name = document.getElementById('joinName').value.trim();
   if (!name) { document.getElementById('joinName').focus(); return; }
 
@@ -357,34 +371,31 @@ function joinMeeting() {
   const color = COLORS.find(c => !used.includes(c)) || COLORS[Object.keys(liveData.participants).length % COLORS.length];
   const pid   = genId();
 
-  // 낙관적 업데이트 → 즉시 반영
   liveData.participants[pid] = { name, color, slots: {} };
   myPid = pid; setMyPid(meetingId, pid);
   document.getElementById('joinName').value = '';
   render();
-
-  // Gun에 저장
-  gMeet(meetingId).get('participants').get(pid).put({ name, color });
   toast(`${name}으로 참여했습니다! 달력에서 일정을 선택하세요 📅`);
+
+  try { isSaving = true; await apiSave(meetingId, liveData); } catch(e) {} finally { isSaving = false; }
 }
 
 // ── 일정 토글 ──
-function toggleSlot(ds, period) {
+async function toggleSlot(ds, period) {
   if (!myPid) { toast('먼저 이름을 입력해 참여하세요'); return; }
-  const me  = liveData.participants[myPid];
+  const me = liveData.participants[myPid];
   if (!me) return;
   const cur  = me.slots[ds] || { am: false, pm: false };
   const next = { ...cur, [period]: !cur[period] };
 
-  // 낙관적 업데이트
   if (next.am || next.pm) me.slots[ds] = next;
   else delete me.slots[ds];
   render();
 
-  gMeet(meetingId).get('participants').get(myPid).get('slots').get(ds).put(next);
+  try { isSaving = true; await apiSave(meetingId, liveData); } catch(e) {} finally { isSaving = false; }
 }
 
-function toggleDate(ds) {
+async function toggleDate(ds) {
   if (!myPid) { toast('먼저 이름을 입력해 참여하세요'); return; }
   const me = liveData.participants[myPid];
   if (!me) return;
@@ -394,17 +405,18 @@ function toggleDate(ds) {
   if (!has) me.slots[ds] = next; else delete me.slots[ds];
   render();
 
-  gMeet(meetingId).get('participants').get(myPid).get('slots').get(ds).put(next);
+  try { isSaving = true; await apiSave(meetingId, liveData); } catch(e) {} finally { isSaving = false; }
 }
 
 // ── 참여자 삭제 (관리자) ──
-function deleteParticipant(pid) {
+async function deleteParticipant(pid) {
   const p = liveData.participants[pid];
   if (!p || !confirm(`"${p.name}"을(를) 삭제할까요?`)) return;
   delete liveData.participants[pid];
   if (myPid === pid) { myPid = null; localStorage.removeItem('yaksok_pid_' + meetingId); }
   render();
-  gMeet(meetingId).get('participants').get(pid).put({ deleted: true, name: null, color: null });
+
+  try { isSaving = true; await apiSave(meetingId, liveData); } catch(e) {} finally { isSaving = false; }
 }
 
 // ── 약속 삭제 (관리자, 홈에서) ──
@@ -412,7 +424,6 @@ function deleteMeeting(id, e) {
   e.stopPropagation();
   const m = getAdminMeetings().find(x => x.id === id);
   if (!m || !confirm(`"${m.title}" 약속을 삭제할까요?`)) return;
-  gMeet(id).put({ deleted: true });
   removeAdminMeeting(id);
   renderMeetingList();
 }
