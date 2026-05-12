@@ -129,6 +129,8 @@
     .leg { display: flex; align-items: center; gap: 4px; }
     .leg-box { width: 13px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
+    #bestList { max-height: calc(100vh - 180px); overflow-y: auto; padding-right: 2px; }
+    @media(max-width:960px) { #bestList { max-height: 320px; } }
     .best-list { display: flex; flex-direction: column; gap: 10px; }
     .best-card { padding: 12px 14px; border-radius: 10px; border-left: 4px solid var(--gray-300); background: var(--gray-50); transition: transform .12s; }
     .best-card:hover { transform: translateX(3px); }
