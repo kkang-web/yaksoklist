@@ -48,10 +48,8 @@
     .mode-btn.active { background: var(--purple); color: #fff; }
 
     .ml-section { margin-top: 24px; }
-    .sync-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-200); }
-    .btn-sync { width: 100%; padding: 11px; background: transparent; color: var(--gray-500); border: 1px dashed var(--gray-300); border-radius: 10px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all .2s; }
-    .btn-sync:hover { background: var(--gray-50); color: var(--gray-700); border-color: var(--gray-400); }
-    .sync-desc { font-size: 11px; color: var(--gray-400); margin-top: 7px; text-align: center; line-height: 1.5; }
+    .btn-add-mine { background: #F0FDF4; color: #15803D; border: 1px solid #86EFAC; border-radius: 20px; padding: 8px 14px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; transition: all .2s; }
+    .btn-add-mine:hover { background: #DCFCE7; }
     .ml-header { font-size: 12px; font-weight: 700; color: var(--gray-400); letter-spacing: .6px; text-transform: uppercase; margin-bottom: 10px; }
     .ml-empty { text-align: center; padding: 20px 10px; color: var(--gray-400); font-size: 14px; line-height: 1.7; }
     .ml-item { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--gray-50); border: 2px solid var(--gray-200); cursor: pointer; transition: border-color .15s, background .15s; margin-bottom: 8px; }
@@ -189,11 +187,6 @@
       <div class="ml-header">내가 만든 약속</div>
       <div id="meetingList"></div>
     </div>
-
-    <div class="sync-section">
-      <button class="btn-sync" onclick="copySyncUrl()">📱 다른 기기에서 내 약속 보기</button>
-      <div class="sync-desc">버튼을 누르면 동기화 링크가 복사됩니다<br>다른 기기에서 그 링크를 열면 내 약속이 나타납니다</div>
-    </div>
   </div>
 </div>
 
@@ -209,6 +202,7 @@
         onblur="saveTitle()" onkeydown="if(event.key==='Enter')this.blur();else if(event.key==='Escape')cancelEditTitle()">
     </div>
     <div class="top-bar-right">
+      <button class="btn-add-mine" id="addMineBtn" onclick="addToMyMeetings()" style="display:none">📌 내 일정에 추가</button>
       <button class="btn-share" id="shareBtn">🔗 링크 복사</button>
     </div>
   </div>
@@ -281,65 +275,23 @@ let vy = new Date().getFullYear();
 let vm = new Date().getMonth();
 let selectedMode = 'date';
 
-// ── 사용자 동기화 ──
-let userBlobId      = localStorage.getItem('yaksok_user_blob') || null;
-let userInitialized = false;
-
-async function initUser() {
-  if (userInitialized) return;
-  userInitialized = true;
-  if (!userBlobId) {
-    try {
-      const r = await fetch('/api/meeting', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ _userMeetings: [] }),
-      });
-      if (r.ok || r.status === 201) {
-        const j = await r.json();
-        userBlobId = j.id;
-        localStorage.setItem('yaksok_user_blob', userBlobId);
-      }
-    } catch(e) {}
-  } else {
-    try {
-      const r = await fetch('/api/meeting?id=' + userBlobId);
-      if (r.ok) {
-        const data = await r.json();
-        if (data?._userMeetings) {
-          const remote = data._userMeetings;
-          const local  = getAdminMeetings();
-          const merged = [...local];
-          remote.forEach(rm => { if (!merged.find(lm => lm.id === rm.id)) merged.push(rm); });
-          merged.sort((a, b) => b.createdAt - a.createdAt);
-          localStorage.setItem('yaksok_admin_v2', JSON.stringify(merged));
-          renderMeetingList();
-        }
-      }
-    } catch(e) {}
-  }
+// ── 내 일정에 추가 ──
+function updateAddMineBtn() {
+  const isMine = getAdminMeetings().some(m => m.id === meetingId);
+  document.getElementById('addMineBtn').style.display = isMine ? 'none' : '';
+  document.getElementById('shareBtn').style.display   = isMine ? '' : 'none';
 }
 
-function syncUserMeetings() {
-  if (!userBlobId) return;
-  fetch('/api/meeting?id=' + userBlobId, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ _userMeetings: getAdminMeetings() }),
-  }).catch(() => {});
-}
-
-function copySyncUrl() {
-  if (!userBlobId) { toast('잠시 후 다시 시도하세요'); return; }
-  const url = location.href.split('#')[0] + '#u/' + userBlobId;
-  navigator.clipboard?.writeText(url)
-    .then(() => toast('동기화 링크 복사 완료! 다른 기기에서 이 링크를 열어주세요'))
-    .catch(() => {
-      const t = Object.assign(document.createElement('textarea'), { value: url });
-      t.style.cssText = 'position:fixed;opacity:0';
-      document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t);
-      toast('동기화 링크 복사 완료!');
-    });
+function addToMyMeetings() {
+  if (!meetingId) return;
+  addAdminMeeting({
+    id: meetingId,
+    title: liveData.title,
+    mode: liveData.mode || 'date',
+    createdAt: liveData.createdAt || Date.now(),
+  });
+  updateAddMineBtn();
+  toast('내 일정 목록에 추가되었습니다!');
 }
 
 const COLORS = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#C39BD3','#A29BFE','#FDCB6E','#00B894','#E17055','#74B9FF'];
@@ -347,8 +299,8 @@ const DAYS   = ['일','월','화','수','목','금','토'];
 
 // ── LocalStorage (약속 목록) ──
 function getAdminMeetings() { try { return JSON.parse(localStorage.getItem('yaksok_admin_v2')) || []; } catch(_) { return []; } }
-function addAdminMeeting(m) { const l = getAdminMeetings().filter(x => x.id !== m.id); l.unshift(m); localStorage.setItem('yaksok_admin_v2', JSON.stringify(l)); syncUserMeetings(); }
-function removeAdminMeeting(id) { localStorage.setItem('yaksok_admin_v2', JSON.stringify(getAdminMeetings().filter(x => x.id !== id))); syncUserMeetings(); }
+function addAdminMeeting(m) { const l = getAdminMeetings().filter(x => x.id !== m.id); l.unshift(m); localStorage.setItem('yaksok_admin_v2', JSON.stringify(l)); }
+function removeAdminMeeting(id) { localStorage.setItem('yaksok_admin_v2', JSON.stringify(getAdminMeetings().filter(x => x.id !== id))); }
 
 // ── Screen ──
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); document.getElementById(id).classList.add('on'); }
@@ -360,7 +312,6 @@ function goHome() {
   toggleCreateForm(false);
   showScreen('sHome');
   renderMeetingList();
-  if (!userInitialized) initUser().then(() => renderMeetingList());
 }
 
 async function goMeeting(id) {
@@ -373,6 +324,7 @@ async function goMeeting(id) {
   showScreen('sMeeting');
   document.getElementById('backBtn').style.display = 'inline-block';
   document.getElementById('topTitle').textContent  = liveData.title;
+  updateAddMineBtn();
   render();
   try {
     const r = await fetch('/api/meeting?id=' + id);
@@ -382,6 +334,7 @@ async function goMeeting(id) {
         liveData = data;
         localStorage.setItem('yaksok_data_' + id, JSON.stringify(data));
         document.getElementById('topTitle').textContent = data.title;
+        updateAddMineBtn();
         render();
       }
     }
@@ -440,7 +393,7 @@ function saveTitle() {
     liveData.title = t;
     const meetings = getAdminMeetings();
     const m = meetings.find(x => x.id === meetingId);
-    if (m) { m.title = t; localStorage.setItem('yaksok_admin_v2', JSON.stringify(meetings)); syncUserMeetings(); }
+    if (m) { m.title = t; localStorage.setItem('yaksok_admin_v2', JSON.stringify(meetings)); }
     saveMeetingData(meetingId, liveData);
   }
   document.getElementById('topTitle').textContent = liveData.title;
@@ -713,18 +666,8 @@ document.getElementById('joinName').addEventListener('keydown', e=>{ if(e.key===
 // ── Init ──
 (function() {
   const hash = location.hash.slice(1);
-  if (hash.startsWith('u/')) {
-    const blobId = hash.slice(2);
-    userBlobId = blobId;
-    localStorage.setItem('yaksok_user_blob', blobId);
-    history.replaceState(null, '', location.pathname);
-    userInitialized = false;
-    goHome();
-  } else if (hash.startsWith('m/')) {
-    goMeeting(hash.slice(2));
-  } else {
-    goHome();
-  }
+  if (hash.startsWith('m/')) goMeeting(hash.slice(2));
+  else goHome();
 })();
 </script>
 </body>
