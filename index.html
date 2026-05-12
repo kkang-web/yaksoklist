@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>약속잡기</title>
+  <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --purple: #7C3AED; --purple-h: #6D28D9; --purple-light: #EDE9FE;
+      --g100: #D1FAE5; --g200: #A7F3D0;
+      --gray-50: #F9FAFB; --gray-100: #F3F4F6; --gray-200: #E5E7EB;
+      --gray-400: #9CA3AF; --gray-500: #6B7280; --gray-700: #374151; --gray-900: #111827;
+      --amber-100: #FEF3C7; --amber-600: #D97706;
+      --r: 12px;
+      --sh: 0 4px 6px -1px rgb(0 0 0/.1),0 2px 4px -2px rgb(0 0 0/.1);
+      --sh-lg: 0 10px 15px -3px rgb(0 0 0/.1),0 4px 6px -4px rgb(0 0 0/.1);
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh; color: var(--gray-900);
+    }
+    .screen { display: none; }
+
+    /* ── Home ── */
+    #sHome.on { display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; padding: 40px 20px 60px; }
+    .home-card { background: #fff; border-radius: 24px; padding: 40px 36px; width: 100%; max-width: 460px; box-shadow: var(--sh-lg); }
+    .home-hero { text-align: center; margin-bottom: 28px; }
+    .home-hero .ei { font-size: 56px; display: block; margin-bottom: 12px; }
+    .home-hero h1 { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+    .home-hero p { color: var(--gray-500); font-size: 14px; }
+
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; color: var(--gray-700); margin-bottom: 6px; }
+    .field input { width: 100%; padding: 12px 14px; border: 2px solid var(--gray-200); border-radius: 10px; font-size: 15px; font-family: inherit; outline: none; transition: border-color .2s; }
+    .field input:focus { border-color: var(--purple); }
+
+    .btn-main { display: block; width: 100%; padding: 14px; background: var(--purple); color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background .2s, transform .1s; }
+    .btn-main:hover { background: var(--purple-h); }
+    .btn-main:active { transform: scale(.98); }
+    .btn-cancel { padding: 14px 16px; background: var(--gray-100); color: var(--gray-700); border: none; border-radius: 10px; font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background .2s; flex-shrink: 0; }
+    .btn-cancel:hover { background: var(--gray-200); }
+    .create-row { display: flex; gap: 8px; }
+
+    .mode-toggle { display: flex; border-radius: 10px; border: 2px solid var(--gray-200); overflow: hidden; margin-top: 2px; }
+    .mode-btn { flex: 1; padding: 11px 8px; border: none; background: none; cursor: pointer; font-size: 14px; font-weight: 600; font-family: inherit; color: var(--gray-500); transition: background .2s, color .2s; line-height: 1.3; }
+    .mode-btn.active { background: var(--purple); color: #fff; }
+
+    .ml-section { margin-top: 24px; }
+    .ml-header { font-size: 12px; font-weight: 700; color: var(--gray-400); letter-spacing: .6px; text-transform: uppercase; margin-bottom: 10px; }
+    .ml-empty { text-align: center; padding: 20px 10px; color: var(--gray-400); font-size: 14px; line-height: 1.7; }
+    .ml-item { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--gray-50); border: 2px solid var(--gray-200); cursor: pointer; transition: border-color .15s, background .15s; margin-bottom: 8px; }
+    .ml-item:hover { border-color: var(--purple); background: var(--purple-light); }
+    .ml-info { flex: 1; min-width: 0; }
+    .ml-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ml-meta { font-size: 12px; color: var(--gray-500); display: flex; gap: 5px; align-items: center; }
+    .ml-badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 8px; background: var(--purple-light); color: var(--purple); }
+    .ml-del { background: none; border: none; cursor: pointer; padding: 5px 7px; font-size: 15px; color: var(--gray-400); border-radius: 6px; transition: color .15s, background .15s; flex-shrink: 0; }
+    .ml-del:hover { color: #EF4444; background: #FEE2E2; }
+
+    /* ── Meeting ── */
+    #sMeeting.on { display: block; min-height: 100vh; }
+    .top-bar { background: rgba(255,255,255,.15); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 20; }
+    .top-title { color: #fff; font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .top-bar-right { display: flex; gap: 8px; align-items: center; }
+    .btn-share { background: #fff; color: var(--purple); border: none; border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity .2s; }
+    .btn-share:hover { opacity: .85; }
+    .btn-back { background: rgba(255,255,255,.2); color: #fff; border: 1px solid rgba(255,255,255,.4); border-radius: 20px; padding: 8px 14px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background .2s; display: none; }
+    .btn-back:hover { background: rgba(255,255,255,.3); }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.25); animation: livepulse 2s infinite; }
+    @keyframes livepulse { 0%,100% { box-shadow: 0 0 0 3px rgba(34,197,94,.25); } 50% { box-shadow: 0 0 0 6px rgba(34,197,94,.08); } }
+
+    .layout { max-width: 1200px; margin: 24px auto; padding: 0 16px; display: grid; grid-template-columns: 250px 1fr 290px; gap: 18px; align-items: start; }
+    @media(max-width:960px) { .layout { grid-template-columns: 1fr; } }
+
+    .card { background: #fff; border-radius: var(--r); padding: 20px; box-shadow: var(--sh); }
+    .card-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 6px; }
+
+    .p-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .p-row input { flex: 1; padding: 9px 12px; border: 2px solid var(--gray-200); border-radius: 8px; font-size: 14px; font-family: inherit; outline: none; transition: border-color .2s; }
+    .p-row input:focus { border-color: var(--purple); }
+    .btn-add { padding: 9px 14px; background: var(--purple); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; }
+    .btn-add:hover { background: var(--purple-h); }
+
+    .p-list { display: flex; flex-direction: column; gap: 7px; }
+    .p-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 9px; border: 2px solid transparent; }
+    .p-item.active { background: var(--purple-light); border-color: var(--purple); }
+    .p-dot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; }
+    .p-name { font-size: 14px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .p-cnt { font-size: 12px; padding: 2px 7px; border-radius: 9px; background: var(--gray-100); color: var(--gray-500); }
+    .active .p-cnt { background: #fff; color: var(--purple); font-weight: 700; }
+    .p-del-btn { background: none; border: none; cursor: pointer; padding: 3px 5px; font-size: 14px; color: var(--gray-400); border-radius: 5px; transition: color .15s, background .15s; flex-shrink: 0; line-height: 1; }
+    .p-del-btn:hover { color: #EF4444; background: #FEE2E2; }
+
+    .tip { padding: 12px; background: var(--amber-100); border-radius: 9px; font-size: 13px; color: var(--amber-600); line-height: 1.55; margin-top: 12px; }
+    .empty-msg { text-align: center; padding: 20px 10px; color: var(--gray-400); font-size: 13px; line-height: 1.7; }
+    .empty-msg .ei { font-size: 36px; display: block; margin-bottom: 10px; }
+
+    .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .cal-nav button { background: none; border: 1px solid var(--gray-200); border-radius: 7px; width: 32px; height: 32px; font-size: 17px; cursor: pointer; color: var(--gray-700); display: flex; align-items: center; justify-content: center; transition: background .15s; }
+    .cal-nav button:hover { background: var(--gray-100); }
+    .cal-month { font-size: 17px; font-weight: 700; }
+    .wdays { display: grid; grid-template-columns: repeat(7,1fr); margin-bottom: 4px; }
+    .wd { text-align: center; font-size: 11px; font-weight: 600; color: var(--gray-400); padding: 3px; }
+    .wd:first-child { color: #EF4444; }
+    .wd:last-child { color: #3B82F6; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+    .day { border-radius: 10px; display: flex; flex-direction: column; align-items: stretch; padding: 4px 3px 3px; gap: 2px; background: var(--gray-50); }
+    .day.blank { background: transparent; }
+    .dn { font-size: 13px; font-weight: 700; text-align: center; line-height: 1; padding: 1px 0; margin-bottom: 1px; }
+    .day.sun .dn { color: #EF4444; }
+    .day.sat .dn { color: #3B82F6; }
+    .day.today .dn { background: var(--purple); color: #fff; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; margin: 0 auto 2px; }
+    .slot { border-radius: 5px; padding: 2px 4px; display: flex; align-items: center; gap: 3px; cursor: pointer; transition: filter .12s, transform .1s; background: var(--gray-100); min-height: 18px; }
+    .slot:hover { filter: brightness(.9); transform: scale(1.04); position: relative; z-index: 1; }
+    .slot.mine-slot { box-shadow: inset 0 0 0 2px var(--purple); }
+    .slot-lbl { font-size: 9px; font-weight: 700; color: var(--gray-500); flex-shrink: 0; width: 16px; line-height: 1; }
+    .slot.mine-slot .slot-lbl { color: var(--purple); }
+    .slot-dots { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; justify-content: flex-end; }
+    .sdot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+    .slot.s1 { background: var(--g100); }
+    .slot.s2 { background: var(--g200); }
+    .slot.s3 { background: linear-gradient(135deg,#FDE68A 0%,#FBBF24 100%); border: 1px solid #D97706; box-shadow: 0 1px 5px rgba(217,119,6,.3); }
+    .slot.s3.mine-slot { box-shadow: 0 1px 5px rgba(217,119,6,.3), inset 0 0 0 2px var(--purple); }
+    .slot.s3 .slot-lbl { color: #92400E; }
+    .slot.s3.mine-slot .slot-lbl { color: var(--purple); }
+    .legend { margin-top: 12px; display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--gray-500); }
+    .leg { display: flex; align-items: center; gap: 4px; }
+    .leg-box { width: 13px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+    .best-list { display: flex; flex-direction: column; gap: 10px; }
+    .best-card { padding: 12px 14px; border-radius: 10px; border-left: 4px solid var(--gray-300); background: var(--gray-50); transition: transform .12s; }
+    .best-card:hover { transform: translateX(3px); }
+    .best-card.gold { border-left-color: #D97706; background: #FFFBEB; }
+    .best-date-lbl { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .best-slot-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; flex-wrap: wrap; }
+    .best-slot-row:last-child { margin-bottom: 0; }
+    .bsr-lbl { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 8px; background: var(--gray-200); color: var(--gray-700); flex-shrink: 0; }
+    .bsr-lbl.gold { background: linear-gradient(135deg,#FDE68A,#FBBF24); color: #92400E; border: 1px solid #D97706; }
+    .bsr-cnt { font-size: 11px; color: var(--gray-500); flex-shrink: 0; }
+    .bsr-who { display: flex; flex-wrap: wrap; gap: 4px; }
+    .who-chip { display: flex; align-items: center; gap: 3px; font-size: 11px; background: #fff; padding: 2px 7px; border-radius: 9px; color: var(--gray-700); }
+    .who-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--gray-900); color: #fff; padding: 11px 22px; border-radius: 100px; font-size: 14px; font-weight: 600; z-index: 100; pointer-events: none; transition: transform .3s cubic-bezier(.34,1.56,.64,1); white-space: nowrap; }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<!-- Home (관리자) -->
+<div id="sHome" class="screen on">
+  <div class="home-card">
+    <div class="home-hero">
+      <span class="ei">📅</span>
+      <h1>약속잡기</h1>
+      <p>약속을 만들고 링크를 공유하세요</p>
+    </div>
+
+    <div id="createForm" style="display:none">
+      <div class="field">
+        <label>약속 이름</label>
+        <input id="mtitle" type="text" placeholder="예: 대학 동기 6월 모임" maxlength="50" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>조사 방식</label>
+        <div class="mode-toggle">
+          <button class="mode-btn active" id="modeSlot" onclick="setMode('slot')">🍽️ 점심 / 저녁</button>
+          <button class="mode-btn" id="modeDate" onclick="setMode('date')">📆 날짜만</button>
+        </div>
+      </div>
+      <div class="create-row">
+        <button class="btn-main" id="createBtn" style="flex:1">만들기 →</button>
+        <button class="btn-cancel" onclick="toggleCreateForm(false)">취소</button>
+      </div>
+    </div>
+
+    <button class="btn-main" id="newMeetingBtn" onclick="toggleCreateForm(true)">+ 새 약속 만들기</button>
+
+    <div class="ml-section">
+      <div class="ml-header">내가 만든 약속</div>
+      <div id="meetingList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Meeting (관리자 + 참여자 공통) -->
+<div id="sMeeting" class="screen">
+  <div class="top-bar">
+    <div class="top-title">
+      <button class="btn-back" id="backBtn">← 목록</button>
+      <span>📅</span>
+      <span id="topTitle">로딩 중...</span>
+      <span class="live-dot" title="실시간 동기화 중"></span>
+    </div>
+    <div class="top-bar-right">
+      <button class="btn-share" id="shareBtn">🔗 링크 복사</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="card">
+      <div class="card-title">👥 참여자</div>
+      <div id="joinSection">
+        <div class="p-row">
+          <input id="joinName" type="text" placeholder="내 이름 입력" maxlength="20" autocomplete="off">
+          <button class="btn-add" id="joinBtn">참여</button>
+        </div>
+        <div class="tip" style="margin-top:0">👆 이름을 입력하면 달력에서 내 일정을 선택할 수 있어요</div>
+      </div>
+      <div id="plist" class="p-list"></div>
+      <div id="ptip" class="tip" style="display:none">✏️ 달력에서 클릭해 내 일정을 선택/해제하세요</div>
+    </div>
+
+    <div class="card">
+      <div class="cal-nav">
+        <button id="prevM">‹</button>
+        <div class="cal-month" id="calTitle"></div>
+        <button id="nextM">›</button>
+      </div>
+      <div class="wdays">
+        <div class="wd">일</div><div class="wd">월</div><div class="wd">화</div>
+        <div class="wd">수</div><div class="wd">목</div><div class="wd">금</div><div class="wd">토</div>
+      </div>
+      <div id="calGrid" class="cal-grid"></div>
+      <div class="legend">
+        <div class="leg"><div class="leg-box" style="background:linear-gradient(135deg,#FDE68A,#FBBF24);border:1px solid #D97706"></div>전원 가능</div>
+        <div class="leg"><div class="leg-box" style="background:var(--g200)"></div>많이 가능</div>
+        <div class="leg"><div class="leg-box" style="background:var(--g100)"></div>일부 가능</div>
+        <div class="leg"><div class="leg-box" style="background:var(--gray-100)"></div>미선택</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⭐ 추천 날짜</div>
+      <div id="bestList"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Gun.js 실시간 DB (계정 불필요, 무료 공개 릴레이 사용) ──
+const gun = Gun([
+  'https://peer.wallie.io/gun',
+  'https://relay.peer.ooo/gun',
+]);
+function gMeet(id) { return gun.get('yaksok_v1').get(id); }
+function genId()  { return Math.random().toString(36).slice(2, 10); }
+
+// ── State ──
+let liveData    = { title: '', mode: 'slot', participants: {} };
+let meetingId   = null;
+let myPid       = null;
+let isAdminUser = false;
+let vy = new Date().getFullYear();
+let vm = new Date().getMonth();
+let selectedMode = 'slot';
+let renderTimer  = null;
+
+const COLORS = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#C39BD3','#A29BFE','#FDCB6E','#00B894','#E17055','#74B9FF'];
+const DAYS   = ['일','월','화','수','목','금','토'];
+
+// ── LocalStorage (관리자 목록 & 내 참여자ID) ──
+function getAdminMeetings() { try { return JSON.parse(localStorage.getItem('yaksok_admin_v2')) || []; } catch(_) { return []; } }
+function addAdminMeeting(m) { const l = getAdminMeetings().filter(x => x.id !== m.id); l.unshift(m); localStorage.setItem('yaksok_admin_v2', JSON.stringify(l)); }
+function removeAdminMeeting(id) { localStorage.setItem('yaksok_admin_v2', JSON.stringify(getAdminMeetings().filter(x => x.id !== id))); }
+function getMyPid(mid) { return localStorage.getItem('yaksok_pid_' + mid); }
+function setMyPid(mid, pid) { localStorage.setItem('yaksok_pid_' + mid, pid); }
+
+// ── Screen ──
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('on')); document.getElementById(id).classList.add('on'); }
+
+function schedRender() { clearTimeout(renderTimer); renderTimer = setTimeout(render, 80); }
+
+function goHome() {
+  meetingId = null; myPid = null; isAdminUser = false;
+  liveData = { title: '', mode: 'slot', participants: {} };
+  history.replaceState(null, '', location.pathname);
+  toggleCreateForm(false);
+  showScreen('sHome');
+  renderMeetingList();
+}
+
+function goMeeting(id) {
+  meetingId   = id;
+  isAdminUser = getAdminMeetings().some(m => m.id === id);
+  myPid       = getMyPid(id);
+  liveData    = { title: '로딩 중...', mode: 'slot', participants: {} };
+  history.replaceState(null, '', '#m/' + id);
+  showScreen('sMeeting');
+  document.getElementById('backBtn').style.display   = isAdminUser ? 'inline-block' : 'none';
+  document.getElementById('topTitle').textContent    = '로딩 중...';
+  document.getElementById('joinSection').style.display = myPid ? 'none' : 'block';
+  subscribeMeeting(id);
+}
+
+// ── Gun.js 실시간 구독 ──
+function subscribeMeeting(id) {
+  const m = gMeet(id);
+
+  m.get('title').on(v => { if (typeof v === 'string' && v) { liveData.title = v; document.getElementById('topTitle').textContent = v; }});
+  m.get('mode').on(v  => { if (typeof v === 'string' && v) liveData.mode = v; });
+
+  m.get('participants').map().on(function(pData, pid) {
+    if (!pData || typeof pData !== 'object' || pData.deleted || !pData.name) {
+      if (liveData.participants[pid]) { delete liveData.participants[pid]; schedRender(); }
+      return;
+    }
+    if (!liveData.participants[pid]) {
+      liveData.participants[pid] = { name: '', color: '', slots: {} };
+      // 슬롯 구독
+      m.get('participants').get(pid).get('slots').map().on(function(slotData, ds) {
+        if (!liveData.participants[pid]) return;
+        if (!slotData || typeof slotData !== 'object' || (!slotData.am && !slotData.pm)) {
+          delete liveData.participants[pid].slots[ds];
+        } else {
+          liveData.participants[pid].slots[ds] = { am: !!slotData.am, pm: !!slotData.pm };
+        }
+        schedRender();
+      });
+    }
+    if (pData.name)  liveData.participants[pid].name  = pData.name;
+    if (pData.color) liveData.participants[pid].color = pData.color;
+    schedRender();
+  });
+}
+
+// ── 약속 생성 (관리자) ──
+function createMeeting() {
+  const t = document.getElementById('mtitle').value.trim();
+  if (!t) { document.getElementById('mtitle').focus(); return; }
+  const id = genId();
+  gMeet(id).put({ title: t, mode: selectedMode, createdAt: Date.now() });
+  addAdminMeeting({ id, title: t, mode: selectedMode, createdAt: Date.now() });
+  toggleCreateForm(false);
+  document.getElementById('mtitle').value = '';
+  goMeeting(id);
+  toast('약속 생성 완료! 링크를 복사해 친구들에게 공유하세요 🎉');
+}
+
+// ── 참여 (이름 입력) ──
+function joinMeeting() {
+  const name = document.getElementById('joinName').value.trim();
+  if (!name) { document.getElementById('joinName').focus(); return; }
+
+  const existing = Object.entries(liveData.participants).find(([, p]) => p.name === name);
+  if (existing) {
+    myPid = existing[0]; setMyPid(meetingId, myPid);
+    toast(`${name}으로 재접속했습니다`); render(); return;
+  }
+
+  const used  = Object.values(liveData.participants).map(p => p.color);
+  const color = COLORS.find(c => !used.includes(c)) || COLORS[Object.keys(liveData.participants).length % COLORS.length];
+  const pid   = genId();
+
+  // 낙관적 업데이트 → 즉시 반영
+  liveData.participants[pid] = { name, color, slots: {} };
+  myPid = pid; setMyPid(meetingId, pid);
+  document.getElementById('joinName').value = '';
+  render();
+
+  // Gun에 저장
+  gMeet(meetingId).get('participants').get(pid).put({ name, color });
+  toast(`${name}으로 참여했습니다! 달력에서 일정을 선택하세요 📅`);
+}
+
+// ── 일정 토글 ──
+function toggleSlot(ds, period) {
+  if (!myPid) { toast('먼저 이름을 입력해 참여하세요'); return; }
+  const me  = liveData.participants[myPid];
+  if (!me) return;
+  const cur  = me.slots[ds] || { am: false, pm: false };
+  const next = { ...cur, [period]: !cur[period] };
+
+  // 낙관적 업데이트
+  if (next.am || next.pm) me.slots[ds] = next;
+  else delete me.slots[ds];
+  render();
+
+  gMeet(meetingId).get('participants').get(myPid).get('slots').get(ds).put(next);
+}
+
+function toggleDate(ds) {
+  if (!myPid) { toast('먼저 이름을 입력해 참여하세요'); return; }
+  const me = liveData.participants[myPid];
+  if (!me) return;
+  const has  = me.slots[ds] && (me.slots[ds].am || me.slots[ds].pm);
+  const next = has ? { am: false, pm: false } : { am: true, pm: true };
+
+  if (!has) me.slots[ds] = next; else delete me.slots[ds];
+  render();
+
+  gMeet(meetingId).get('participants').get(myPid).get('slots').get(ds).put(next);
+}
+
+// ── 참여자 삭제 (관리자) ──
+function deleteParticipant(pid) {
+  const p = liveData.participants[pid];
+  if (!p || !confirm(`"${p.name}"을(를) 삭제할까요?`)) return;
+  delete liveData.participants[pid];
+  if (myPid === pid) { myPid = null; localStorage.removeItem('yaksok_pid_' + meetingId); }
+  render();
+  gMeet(meetingId).get('participants').get(pid).put({ deleted: true, name: null, color: null });
+}
+
+// ── 약속 삭제 (관리자, 홈에서) ──
+function deleteMeeting(id, e) {
+  e.stopPropagation();
+  const m = getAdminMeetings().find(x => x.id === id);
+  if (!m || !confirm(`"${m.title}" 약속을 삭제할까요?`)) return;
+  gMeet(id).put({ deleted: true });
+  removeAdminMeeting(id);
+  renderMeetingList();
+}
+
+// ── Render ──
+function render() {
+  const me = myPid && liveData.participants[myPid];
+  document.getElementById('joinSection').style.display = me ? 'none' : 'block';
+  document.getElementById('ptip').style.display        = me ? 'block' : 'none';
+  if (!me && myPid) myPid = null;
+  renderP(); renderCal(); renderBest();
+}
+
+function renderP() {
+  const parts = Object.entries(liveData.participants);
+  const el    = document.getElementById('plist');
+  if (!parts.length) { el.innerHTML = '<div class="empty-msg"><span class="ei">👋</span>아직 참여자가 없어요</div>'; return; }
+  el.innerHTML = parts.map(([pid, p]) => {
+    const isMe  = pid === myPid;
+    const slots = Object.keys(p.slots || {}).length;
+    return `<div class="p-item${isMe ? ' active' : ''}">
+      <div class="p-dot" style="background:${p.color}"></div>
+      <div class="p-name">${esc(p.name)}${isMe ? ' <span style="font-size:11px;opacity:.65">(나)</span>' : ''}</div>
+      <div class="p-cnt">${slots}일</div>
+      ${isAdminUser && !isMe ? `<button class="p-del-btn" onclick="deleteParticipant('${pid}')">✕</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderCal() {
+  document.getElementById('calTitle').textContent = `${vy}년 ${vm+1}월`;
+  const first    = new Date(vy, vm, 1).getDay();
+  const last     = new Date(vy, vm+1, 0).getDate();
+  const todayStr = fmt(new Date());
+  const parts    = Object.entries(liveData.participants);
+  const total    = parts.length;
+  const me       = myPid ? liveData.participants[myPid] : null;
+
+  let html = '';
+  for (let i = 0; i < first; i++) html += '<div class="day blank"></div>';
+  for (let d = 1; d <= last; d++) {
+    const ds  = `${vy}-${pad(vm+1)}-${pad(d)}`;
+    const dow = (first + d - 1) % 7;
+    const dayCls = ['day', dow===0?'sun':dow===6?'sat':'', ds===todayStr?'today':''].filter(Boolean).join(' ');
+
+    if (liveData.mode === 'date') {
+      const avail  = parts.filter(([, p]) => p.slots?.[ds]?.am || p.slots?.[ds]?.pm);
+      const isMine = !!(me?.slots?.[ds]?.am || me?.slots?.[ds]?.pm);
+      const cls    = ['slot', heatClass(avail.length, total), isMine?'mine-slot':''].filter(Boolean).join(' ');
+      html += `<div class="${dayCls}">
+        <div class="dn">${d}</div>
+        <div class="${cls}" onclick="toggleDate('${ds}')">
+          <div class="slot-dots">${avail.map(([,p])=>`<div class="sdot" style="background:${p.color}"></div>`).join('')}</div>
+        </div>
+      </div>`;
+    } else {
+      const amA  = parts.filter(([, p]) => p.slots?.[ds]?.am);
+      const pmA  = parts.filter(([, p]) => p.slots?.[ds]?.pm);
+      const amM  = !!me?.slots?.[ds]?.am;
+      const pmM  = !!me?.slots?.[ds]?.pm;
+      const amCl = ['slot', heatClass(amA.length, total), amM?'mine-slot':''].filter(Boolean).join(' ');
+      const pmCl = ['slot', heatClass(pmA.length, total), pmM?'mine-slot':''].filter(Boolean).join(' ');
+      html += `<div class="${dayCls}">
+        <div class="dn">${d}</div>
+        <div class="${amCl}" onclick="toggleSlot('${ds}','am')">
+          <span class="slot-lbl">점심</span>
+          <div class="slot-dots">${amA.map(([,p])=>`<div class="sdot" style="background:${p.color}"></div>`).join('')}</div>
+        </div>
+        <div class="${pmCl}" onclick="toggleSlot('${ds}','pm')">
+          <span class="slot-lbl">저녁</span>
+          <div class="slot-dots">${pmA.map(([,p])=>`<div class="sdot" style="background:${p.color}"></div>`).join('')}</div>
+        </div>
+      </div>`;
+    }
+  }
+  document.getElementById('calGrid').innerHTML = html;
+}
+
+function renderBest() {
+  const el    = document.getElementById('bestList');
+  const parts = Object.entries(liveData.participants);
+  if (!parts.length) { el.innerHTML = '<div class="empty-msg"><span class="ei">📊</span>참여자를 기다리는 중...</div>'; return; }
+
+  const map = new Map();
+  parts.forEach(([, p]) => {
+    Object.entries(p.slots || {}).forEach(([ds, s]) => {
+      if (!s.am && !s.pm) return;
+      if (!map.has(ds)) map.set(ds, { am:[], pm:[] });
+      if (s.am) map.get(ds).am.push(p);
+      if (s.pm) map.get(ds).pm.push(p);
+    });
+  });
+  if (!map.size) { el.innerHTML = '<div class="empty-msg"><span class="ei">📅</span>달력에서 일정을 선택해주세요</div>'; return; }
+
+  const total  = parts.length;
+  const sorted = [...map.entries()].sort((a,b) => {
+    const sa = Math.max(a[1].am.length, a[1].pm.length);
+    const sb = Math.max(b[1].am.length, b[1].pm.length);
+    return sb !== sa ? sb - sa : a[0].localeCompare(b[0]);
+  }).slice(0, 8);
+
+  const slotRow = (label, ps, isAll) => !ps.length ? '' :
+    `<div class="best-slot-row">
+      <span class="bsr-lbl${isAll?' gold':''}">${label}${isAll?' ⭐':''}</span>
+      <span class="bsr-cnt">${ps.length}/${total}명</span>
+      <div class="bsr-who">${ps.map(p=>`<div class="who-chip"><div class="who-dot" style="background:${p.color}"></div>${esc(p.name)}</div>`).join('')}</div>
+    </div>`;
+
+  if (liveData.mode === 'date') {
+    el.innerHTML = '<div class="best-list">' + sorted.map(([ds,{am}]) => {
+      const dt = new Date(ds+'T00:00:00'), isGold = am.length===total;
+      return `<div class="best-card${isGold?' gold':''}"><div class="best-date-lbl">${dt.getMonth()+1}월 ${dt.getDate()}일 (${DAYS[dt.getDay()]})</div>${slotRow(isGold?'전원 가능':'가능',am,isGold)}</div>`;
+    }).join('') + '</div>';
+  } else {
+    el.innerHTML = '<div class="best-list">' + sorted.map(([ds,{am,pm}]) => {
+      const dt=new Date(ds+'T00:00:00'), allAM=am.length===total, allPM=pm.length===total, isGold=allAM||allPM;
+      const rows = pm.length>am.length ? slotRow('저녁',pm,allPM)+slotRow('점심',am,allAM) : slotRow('점심',am,allAM)+slotRow('저녁',pm,allPM);
+      return `<div class="best-card${isGold?' gold':''}"><div class="best-date-lbl">${dt.getMonth()+1}월 ${dt.getDate()}일 (${DAYS[dt.getDay()]})</div>${rows}</div>`;
+    }).join('') + '</div>';
+  }
+}
+
+function renderMeetingList() {
+  const meetings = getAdminMeetings();
+  const el = document.getElementById('meetingList');
+  if (!meetings.length) { el.innerHTML = '<div class="ml-empty">아직 만든 약속이 없어요<br>첫 약속을 만들어보세요!</div>'; return; }
+  el.innerHTML = meetings.map(m => {
+    const badge = m.mode==='date'?'날짜만':'점심+저녁';
+    const dt    = new Date(m.createdAt);
+    return `<div class="ml-item" onclick="goMeeting('${m.id}')">
+      <div class="ml-info">
+        <div class="ml-title">${esc(m.title)}</div>
+        <div class="ml-meta"><span class="ml-badge">${badge}</span><span>${dt.getMonth()+1}/${dt.getDate()} 생성</span></div>
+      </div>
+      <button class="ml-del" onclick="deleteMeeting('${m.id}',event)" title="삭제">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Utils ──
+function setMode(mode) {
+  selectedMode = mode;
+  document.getElementById('modeSlot').classList.toggle('active', mode==='slot');
+  document.getElementById('modeDate').classList.toggle('active', mode==='date');
+}
+function toggleCreateForm(show) {
+  document.getElementById('createForm').style.display    = show ? 'block' : 'none';
+  document.getElementById('newMeetingBtn').style.display = show ? 'none'  : 'block';
+  if (show) { setMode('slot'); document.getElementById('mtitle').focus(); }
+}
+function heatClass(cnt, total) {
+  if (!cnt) return '';
+  if (total>0 && cnt===total) return 's3';
+  if (total>0 && cnt/total>=.5) return 's2';
+  return 's1';
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pad(n) { return String(n).padStart(2,'0'); }
+function fmt(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function changeMonth(d) { vm+=d; if(vm>11){vm=0;vy++;}if(vm<0){vm=11;vy--;} renderCal(); }
+
+function copyShareLink() {
+  const url = location.href.split('#')[0] + '#m/' + meetingId;
+  navigator.clipboard?.writeText(url)
+    .then(()=>toast('링크 복사 완료! 친구들에게 공유하세요 🎉'))
+    .catch(()=>{ const t=Object.assign(document.createElement('textarea'),{value:url}); t.style.cssText='position:fixed;opacity:0'; document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t); toast('링크 복사 완료!'); });
+}
+function toast(msg) {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ── Events ──
+document.getElementById('createBtn').addEventListener('click', createMeeting);
+document.getElementById('shareBtn').addEventListener('click', copyShareLink);
+document.getElementById('backBtn').addEventListener('click', goHome);
+document.getElementById('joinBtn').addEventListener('click', joinMeeting);
+document.getElementById('prevM').addEventListener('click', ()=>changeMonth(-1));
+document.getElementById('nextM').addEventListener('click', ()=>changeMonth(1));
+document.getElementById('mtitle').addEventListener('keydown', e=>{ if(e.key==='Enter') createMeeting(); });
+document.getElementById('joinName').addEventListener('keydown', e=>{ if(e.key==='Enter') joinMeeting(); });
+
+// ── Init ──
+(function() {
+  const hash = location.hash.slice(1);
+  if (hash.startsWith('m/')) goMeeting(hash.slice(2));
+  else goHome();
+})();
+</script>
+</body>
+</html>
