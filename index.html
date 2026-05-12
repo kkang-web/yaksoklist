@@ -247,16 +247,21 @@
 <div id="toast"></div>
 
 <script>
-// ── 저장소 (localStorage) ──
+// ── 저장소 (localStorage 즉시 + API 크로스디바이스) ──
 function genId() { return Math.random().toString(36).slice(2, 10); }
-
-function loadMeetingData(id) {
-  try { return JSON.parse(localStorage.getItem('yaksok_data_' + id)) || null; }
-  catch(_) { return null; }
-}
 
 function saveMeetingData(id, data) {
   localStorage.setItem('yaksok_data_' + id, JSON.stringify(data));
+  fetch('/api/meeting?id=' + id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(() => {});
+}
+
+function localMeetingData(id) {
+  try { return JSON.parse(localStorage.getItem('yaksok_data_' + id)) || null; }
+  catch(_) { return null; }
 }
 
 // ── State ──
@@ -287,17 +292,31 @@ function goHome() {
   renderMeetingList();
 }
 
-function goMeeting(id) {
+async function goMeeting(id) {
   meetingId   = id;
   selectedPid = null;
-  const saved = loadMeetingData(id);
-  const local = getAdminMeetings().find(m => m.id === id);
-  liveData    = saved || { title: local?.title || '', mode: local?.mode || 'date', participants: {} };
+  // 로컬 캐시로 즉시 표시
+  const cached = localMeetingData(id);
+  const local  = getAdminMeetings().find(m => m.id === id);
+  liveData = cached || { title: local?.title || '', mode: local?.mode || 'date', participants: {} };
   history.replaceState(null, '', '#m/' + id);
   showScreen('sMeeting');
   document.getElementById('backBtn').style.display = 'inline-block';
   document.getElementById('topTitle').textContent  = liveData.title;
   render();
+  // API에서 최신 데이터 로드 (크로스디바이스 공유)
+  try {
+    const r = await fetch('/api/meeting?id=' + id);
+    if (r.ok) {
+      const data = await r.json();
+      if (data && meetingId === id) {
+        liveData = data;
+        localStorage.setItem('yaksok_data_' + id, JSON.stringify(data));
+        document.getElementById('topTitle').textContent = data.title;
+        render();
+      }
+    }
+  } catch(e) {}
 }
 
 // ── 약속 생성 ──
