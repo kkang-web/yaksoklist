@@ -28,28 +28,6 @@
     .home-hero h1 { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
     .home-hero p { color: var(--gray-500); font-size: 14px; }
 
-    /* ── Auth header ── */
-    .auth-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--gray-50); border-radius: 10px; margin-bottom: 20px; }
-    .auth-bar-info { font-size: 13px; color: var(--gray-700); font-weight: 600; }
-    .auth-bar-info span { color: var(--gray-400); font-weight: 400; }
-    .btn-auth { padding: 7px 14px; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background .2s; }
-    .btn-login { background: var(--purple); color: #fff; }
-    .btn-login:hover { background: var(--purple-h); }
-    .btn-logout { background: var(--gray-200); color: var(--gray-700); }
-    .btn-logout:hover { background: var(--gray-300, #D1D5DB); }
-
-    /* ── Auth Modal ── */
-    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .modal-card { background: #fff; border-radius: 20px; padding: 32px 28px; width: 100%; max-width: 380px; box-shadow: var(--sh-lg); }
-    .modal-title { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
-    .modal-sub { font-size: 13px; color: var(--gray-500); margin-bottom: 22px; }
-    .modal-tabs { display: flex; border-radius: 10px; border: 2px solid var(--gray-200); overflow: hidden; margin-bottom: 20px; }
-    .tab-btn { flex: 1; padding: 10px; border: none; background: none; cursor: pointer; font-size: 14px; font-weight: 600; font-family: inherit; color: var(--gray-500); transition: background .2s, color .2s; }
-    .tab-btn.active { background: var(--purple); color: #fff; }
-    .auth-error { padding: 10px 12px; background: #FEE2E2; color: #B91C1C; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
-    .auth-success { padding: 10px 12px; background: #D1FAE5; color: #065F46; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
-    .modal-close { float: right; background: none; border: none; font-size: 20px; cursor: pointer; color: var(--gray-400); margin-top: -4px; }
-
     .field { margin-bottom: 16px; }
     .field label { display: block; font-size: 13px; font-weight: 600; color: var(--gray-700); margin-bottom: 6px; }
     .field input { width: 100%; padding: 12px 14px; border: 2px solid var(--gray-200); border-radius: 10px; font-size: 15px; font-family: inherit; outline: none; transition: border-color .2s; }
@@ -78,7 +56,6 @@
     .ml-badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 8px; background: var(--purple-light); color: var(--purple); }
     .ml-del { background: none; border: none; cursor: pointer; padding: 5px 7px; font-size: 15px; color: var(--gray-400); border-radius: 6px; transition: color .15s, background .15s; flex-shrink: 0; }
     .ml-del:hover { color: #EF4444; background: #FEE2E2; }
-    .login-prompt { text-align: center; padding: 24px 10px; color: var(--gray-400); font-size: 14px; line-height: 1.8; }
 
     /* ── Meeting ── */
     #sMeeting.on { display: block; min-height: 100vh; }
@@ -175,33 +152,6 @@
 </head>
 <body>
 
-<!-- Auth Modal -->
-<div id="authModal" style="display:none">
-  <div class="modal-backdrop" onclick="if(event.target===this)closeAuthModal()">
-    <div class="modal-card">
-      <button class="modal-close" onclick="closeAuthModal()">✕</button>
-      <div class="modal-title">약속잡기</div>
-      <div class="modal-sub">아이디로 가입하고 어디서든 내 약속을 관리하세요</div>
-      <div class="modal-tabs">
-        <button class="tab-btn active" id="tabLogin" onclick="switchTab('login')">로그인</button>
-        <button class="tab-btn" id="tabSignup" onclick="switchTab('signup')">회원가입</button>
-      </div>
-      <div id="authMsg" style="display:none"></div>
-      <div class="field">
-        <label>아이디</label>
-        <input id="authEmail" type="text" placeholder="아이디 입력 (영문·숫자·_)" autocomplete="username"
-          oninput="this.value=this.value.replace(/[^a-zA-Z0-9_]/g,'')">
-      </div>
-      <div class="field">
-        <label>비밀번호</label>
-        <input id="authPw" type="password" placeholder="비밀번호 (4자 이상)" autocomplete="current-password"
-          onkeydown="if(event.key==='Enter')submitAuth()">
-      </div>
-      <button class="btn-main" id="authSubmitBtn" onclick="submitAuth()">로그인</button>
-    </div>
-  </div>
-</div>
-
 <!-- Home -->
 <div id="sHome" class="screen on">
   <div class="home-card">
@@ -209,11 +159,6 @@
       <span class="ei">📅</span>
       <h1>약속잡기</h1>
       <p>약속을 만들고 링크를 공유하세요</p>
-    </div>
-
-    <div class="auth-bar">
-      <div class="auth-bar-info" id="authBarInfo"><span>로그인하면 어디서든 내 약속을 볼 수 있어요</span></div>
-      <button class="btn-auth btn-login" id="authBarBtn" onclick="openAuthModal()">로그인</button>
     </div>
 
     <div id="createForm" style="display:none">
@@ -234,7 +179,7 @@
       </div>
     </div>
 
-    <button class="btn-main" id="newMeetingBtn" onclick="onNewMeetingClick()">+ 새 약속 만들기</button>
+    <button class="btn-main" id="newMeetingBtn" onclick="toggleCreateForm(true)">+ 새 약속 만들기</button>
 
     <div class="ml-section">
       <div class="ml-header">내가 만든 약속</div>
@@ -255,7 +200,7 @@
         onblur="saveTitle()" onkeydown="if(event.key==='Enter')this.blur();else if(event.key==='Escape')cancelEditTitle()">
     </div>
     <div class="top-bar-right">
-      <button class="btn-add-mine" id="addMineBtn" onclick="addToMyMeetings()" style="display:none">📌 내 일정에 추가</button>
+      <button class="btn-add-mine" id="addMineBtn" onclick="addToMyMeetings()" style="display:none">📌 내 목록에 추가</button>
       <button class="btn-share" id="shareBtn">🔗 링크 복사</button>
     </div>
   </div>
@@ -271,7 +216,7 @@
         <div class="tip" style="margin-top:0">👆 이름 추가 후 목록에서 클릭해 선택 → 달력에서 일정 입력</div>
       </div>
       <div id="plist" class="p-list"></div>
-      <div id="ptip" class="tip" style="display:none">✏️ 달력에서 클릭해 내 일정을 선택/해제하세요</div>
+      <div id="ptip" class="tip" style="display:none"></div>
     </div>
 
     <div class="card">
@@ -303,10 +248,11 @@
 <div id="toast"></div>
 
 <script>
-// ── Supabase ──
-const SUPA_URL = 'https://dhwlvszqenjgddwtkqjb.supabase.co';
-const SUPA_KEY = 'sb_publishable_MwWWiXPTrY8CTqNSUWSDmg_2aBelhit';
-const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+// ── Supabase (약속 데이터 저장용) ──
+const sb = supabase.createClient(
+  'https://dhwlvszqenjgddwtkqjb.supabase.co',
+  'sb_publishable_MwWWiXPTrY8CTqNSUWSDmg_2aBelhit'
+);
 
 // ── State ──
 let liveData    = { title: '', mode: 'date', participants: {} };
@@ -315,138 +261,21 @@ let selectedPid = null;
 let vy = new Date().getFullYear();
 let vm = new Date().getMonth();
 let selectedMode = 'date';
-let currentUser = null;
-let authTab     = 'login';
 
 const COLORS = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#C39BD3','#A29BFE','#FDCB6E','#00B894','#E17055','#74B9FF'];
 const DAYS   = ['일','월','화','수','목','금','토'];
 
-// ── Auth ──
-function openAuthModal() {
-  switchTab('login');
-  document.getElementById('authEmail').value = '';
-  document.getElementById('authPw').value = '';
-  document.getElementById('authMsg').style.display = 'none';
-  document.getElementById('authModal').style.display = 'block';
-  setTimeout(() => document.getElementById('authEmail').focus(), 50);
-}
-function closeAuthModal() { document.getElementById('authModal').style.display = 'none'; }
-
-function switchTab(tab) {
-  authTab = tab;
-  document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
-  document.getElementById('tabSignup').classList.toggle('active', tab === 'signup');
-  document.getElementById('authSubmitBtn').textContent = tab === 'login' ? '로그인' : '회원가입';
-  document.getElementById('authMsg').style.display = 'none';
-}
-
-function toFakeEmail(username) { return username.toLowerCase() + '@yaksoklist.app'; }
-function toPw(pw) { return pw + '__yk__'; }
-function usernameFromUser(user) {
-  return user?.user_metadata?.username || user?.email?.replace('@yaksoklist.app','') || '';
-}
-
-async function submitAuth() {
-  const username = document.getElementById('authEmail').value.trim();
-  const pw       = document.getElementById('authPw').value;
-  const btn      = document.getElementById('authSubmitBtn');
-  if (!username) { showAuthMsg('아이디를 입력해주세요', false); return; }
-  if (username.length < 2) { showAuthMsg('아이디는 2자 이상이어야 합니다', false); return; }
-  if (!pw) { showAuthMsg('비밀번호를 입력해주세요', false); return; }
-  if (pw.length < 4) { showAuthMsg('비밀번호는 4자 이상이어야 합니다', false); return; }
-
-  btn.disabled = true;
-  btn.textContent = authTab === 'login' ? '로그인 중...' : '가입 중...';
-
-  const email    = toFakeEmail(username);
-  const password = toPw(pw);
-  const { data, error } = authTab === 'login'
-    ? await sb.auth.signInWithPassword({ email, password })
-    : await sb.auth.signUp({ email, password, options: { data: { username } } });
-
-  btn.disabled = false;
-  btn.textContent = authTab === 'login' ? '로그인' : '회원가입';
-
-  if (error) { showAuthMsg(translateError(error.message), false); return; }
-  closeAuthModal();
-}
-
-function translateError(msg) {
-  if (msg.includes('Invalid login')) return '아이디 또는 비밀번호가 틀렸습니다';
-  if (msg.includes('already registered') || msg.includes('already been registered')) return '이미 사용 중인 아이디입니다';
-  if (msg.includes('at least 6') || msg.includes('at least')) return '비밀번호는 4자 이상이어야 합니다';
-  return msg;
-}
-
-function showAuthMsg(text, isOk) {
-  const el = document.getElementById('authMsg');
-  el.className = isOk ? 'auth-success' : 'auth-error';
-  el.textContent = text;
-  el.style.display = 'block';
-}
-
-function updateAuthBar(user) {
-  const info = document.getElementById('authBarInfo');
-  const btn  = document.getElementById('authBarBtn');
-  if (user) {
-    info.innerHTML = `<b>${esc(usernameFromUser(user))}</b>`;
-    btn.textContent = '로그아웃';
-    btn.className = 'btn-auth btn-logout';
-    btn.onclick = () => sb.auth.signOut();
-  } else {
-    info.innerHTML = '<span>로그인하면 어디서든 내 약속을 볼 수 있어요</span>';
-    btn.textContent = '로그인';
-    btn.className = 'btn-auth btn-login';
-    btn.onclick = openAuthModal;
-  }
-}
-
-// ── Meeting list (Supabase + localStorage fallback) ──
+// ── LocalStorage (약속 목록) ──
 function genId() { return Math.random().toString(36).slice(2, 10); }
+function getMyMeetings() { try { return JSON.parse(localStorage.getItem('yaksok_admin_v2')) || []; } catch(_) { return []; } }
+function addMyMeeting(m) { const l = getMyMeetings().filter(x => x.id !== m.id); l.unshift(m); localStorage.setItem('yaksok_admin_v2', JSON.stringify(l)); }
+function removeMyMeeting(id) { localStorage.setItem('yaksok_admin_v2', JSON.stringify(getMyMeetings().filter(x => x.id !== id))); }
 
-function getLocalMeetings() {
-  try { return JSON.parse(localStorage.getItem('yaksok_admin_v2')) || []; } catch(_) { return []; }
-}
-function setLocalMeetings(list) { localStorage.setItem('yaksok_admin_v2', JSON.stringify(list)); }
-
-async function getMyMeetings() {
-  if (currentUser) {
-    const { data } = await sb.from('user_meetings').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
-    return (data || []).map(r => ({ id: r.meeting_id, title: r.title, mode: r.mode, createdAt: new Date(r.created_at).getTime() }));
-  }
-  return getLocalMeetings();
-}
-
-async function addMyMeeting(m) {
-  if (currentUser) {
-    await sb.from('user_meetings').upsert({ user_id: currentUser.id, meeting_id: m.id, title: m.title, mode: m.mode });
-  }
-  const list = getLocalMeetings().filter(x => x.id !== m.id);
-  list.unshift(m);
-  setLocalMeetings(list);
-}
-
-async function removeMyMeeting(id) {
-  if (currentUser) {
-    await sb.from('user_meetings').delete().eq('user_id', currentUser.id).eq('meeting_id', id);
-  }
-  setLocalMeetings(getLocalMeetings().filter(x => x.id !== id));
-}
-
-async function isMine(id) {
-  if (currentUser) {
-    const { data } = await sb.from('user_meetings').select('meeting_id').eq('user_id', currentUser.id).eq('meeting_id', id).maybeSingle();
-    return !!data;
-  }
-  return getLocalMeetings().some(x => x.id === id);
-}
-
-// ── Meeting data (Supabase) ──
+// ── Meeting data (Supabase + localStorage cache) ──
 async function saveMeetingData(id, data) {
   localStorage.setItem('yaksok_data_' + id, JSON.stringify(data));
-  sb.from('meetings').upsert({ id, data }).then(() => {}).catch(() => {});
+  sb.from('meetings').upsert({ id, data }).catch(() => {});
 }
-
 function localMeetingData(id) {
   try { return JSON.parse(localStorage.getItem('yaksok_data_' + id)) || null; } catch(_) { return null; }
 }
@@ -464,11 +293,6 @@ function goHome() {
 }
 
 async function goMeeting(id) {
-  if (!currentUser) {
-    openAuthModal();
-    toast('로그인 후 모임에 입장할 수 있어요');
-    return;
-  }
   meetingId   = id;
   selectedPid = null;
   const cached = localMeetingData(id);
@@ -500,12 +324,11 @@ async function createMeeting() {
 
   const id   = genId();
   const data = { title: t, mode: selectedMode, createdAt: Date.now(), participants: {} };
-
   const { error } = await sb.from('meetings').insert({ id, data });
   btn.textContent = '만들기 →'; btn.disabled = false;
   if (error) { toast('오류: 잠시 후 다시 시도하세요'); return; }
 
-  await addMyMeeting({ id, title: t, mode: selectedMode, createdAt: Date.now() });
+  addMyMeeting({ id, title: t, mode: selectedMode, createdAt: Date.now() });
   localStorage.setItem('yaksok_data_' + id, JSON.stringify(data));
   toggleCreateForm(false);
   document.getElementById('mtitle').value = '';
@@ -519,57 +342,48 @@ async function createMeeting() {
   toast('약속 생성 완료!');
 }
 
-// ── 내 일정에 추가 ──
-async function updateAddMineBtn() {
-  const mine = await isMine(meetingId);
+// ── 내 목록에 추가 ──
+function updateAddMineBtn() {
+  const mine = getMyMeetings().some(m => m.id === meetingId);
   document.getElementById('addMineBtn').style.display = mine ? 'none' : '';
   document.getElementById('shareBtn').style.display   = mine ? '' : 'none';
 }
 
-async function addToMyMeetings() {
+function addToMyMeetings() {
   if (!meetingId) return;
-  if (!currentUser) { openAuthModal(); toast('로그인 후 내 목록에 추가할 수 있어요'); return; }
-  await addMyMeeting({ id: meetingId, title: liveData.title, mode: liveData.mode || 'date', createdAt: liveData.createdAt || Date.now() });
+  addMyMeeting({ id: meetingId, title: liveData.title, mode: liveData.mode || 'date', createdAt: liveData.createdAt || Date.now() });
   updateAddMineBtn();
-  toast('내 일정 목록에 추가되었습니다!');
-}
-
-function onNewMeetingClick() {
-  if (!currentUser) { openAuthModal(); toast('로그인 후 약속을 만들 수 있어요'); return; }
-  toggleCreateForm(true);
+  toast('내 목록에 추가되었습니다!');
 }
 
 // ── 모임 이름 수정 ──
 function startEditTitle() {
   const input = document.getElementById('titleInput');
   input.value = liveData.title;
-  document.getElementById('topTitle').style.display = 'none';
+  document.getElementById('topTitle').style.display    = 'none';
   document.getElementById('editTitleBtn').style.display = 'none';
   input.style.display = 'inline-block';
   input.focus(); input.select();
 }
-async function saveTitle() {
+function saveTitle() {
   const input = document.getElementById('titleInput');
   const t = input.value.trim();
   if (t && t !== liveData.title) {
     liveData.title = t;
-    saveMeetingData(meetingId, liveData);
-    if (currentUser) {
-      await sb.from('user_meetings').update({ title: t }).eq('user_id', currentUser.id).eq('meeting_id', meetingId);
-    }
-    const list = getLocalMeetings();
+    const list = getMyMeetings();
     const m = list.find(x => x.id === meetingId);
-    if (m) { m.title = t; setLocalMeetings(list); }
+    if (m) { m.title = t; localStorage.setItem('yaksok_admin_v2', JSON.stringify(list)); }
+    saveMeetingData(meetingId, liveData);
   }
-  document.getElementById('topTitle').textContent = liveData.title;
-  document.getElementById('topTitle').style.display = '';
+  document.getElementById('topTitle').textContent      = liveData.title;
+  document.getElementById('topTitle').style.display    = '';
   document.getElementById('editTitleBtn').style.display = '';
   input.style.display = 'none';
 }
 function cancelEditTitle() {
-  document.getElementById('topTitle').style.display = '';
+  document.getElementById('topTitle').style.display    = '';
   document.getElementById('editTitleBtn').style.display = '';
-  document.getElementById('titleInput').style.display = 'none';
+  document.getElementById('titleInput').style.display  = 'none';
 }
 
 // ── 참여자 추가 ──
@@ -623,24 +437,19 @@ function deleteParticipant(pid) {
 }
 
 // ── 약속 삭제 ──
-async function deleteMeeting(id, e) {
+function deleteMeeting(id, e) {
   e.stopPropagation();
-  const m = getLocalMeetings().find(x => x.id === id);
+  const m = getMyMeetings().find(x => x.id === id);
   if (!m || !confirm(`"${m.title}" 약속을 삭제할까요?`)) return;
-  await removeMyMeeting(id);
+  removeMyMeeting(id);
   localStorage.removeItem('yaksok_data_' + id);
   renderMeetingList();
 }
 
 // ── Render ──
-async function renderMeetingList() {
+function renderMeetingList() {
+  const meetings = getMyMeetings();
   const el = document.getElementById('meetingList');
-  if (!currentUser && getLocalMeetings().length === 0) {
-    el.innerHTML = '<div class="login-prompt">로그인하면 어디서든 내 약속 목록을<br>확인할 수 있어요 👆</div>';
-    return;
-  }
-  el.innerHTML = '<div class="ml-empty" style="font-size:12px;color:var(--gray-400)">불러오는 중...</div>';
-  const meetings = await getMyMeetings();
   if (!meetings.length) { el.innerHTML = '<div class="ml-empty">아직 만든 약속이 없어요<br>첫 약속을 만들어보세요!</div>'; return; }
   el.innerHTML = meetings.map(m => {
     const badge = m.mode === 'date' ? '날짜만' : '점심+저녁';
@@ -656,7 +465,7 @@ async function renderMeetingList() {
 }
 
 function render() {
-  const sel = selectedPid && liveData.participants[selectedPid];
+  const sel  = selectedPid && liveData.participants[selectedPid];
   const ptip = document.getElementById('ptip');
   ptip.style.display = sel ? 'block' : 'none';
   if (sel) ptip.textContent = `✏️ ${sel.name}의 일정 편집 중`;
@@ -730,7 +539,7 @@ function renderBest() {
   });
   if (!map.size) { el.innerHTML = '<div class="empty-msg"><span class="ei">📅</span>달력에서 일정을 선택해주세요</div>'; return; }
   const total  = parts.length;
-  const sorted = [...map.entries()].sort((a,b) => {
+  const sorted = [...map.entries()].sort((a, b) => {
     const sa = Math.max(a[1].am.length, a[1].pm.length);
     const sb2 = Math.max(b[1].am.length, b[1].pm.length);
     return sb2 !== sa ? sb2 - sa : a[0].localeCompare(b[0]);
@@ -740,14 +549,14 @@ function renderBest() {
     <span class="bsr-cnt">${ps.length}/${total}명</span>
     <div class="bsr-who">${ps.map(p=>`<div class="who-chip"><div class="who-dot" style="background:${p.color}"></div>${esc(p.name)}</div>`).join('')}</div></div>`;
   if (liveData.mode === 'date') {
-    el.innerHTML = '<div class="best-list">' + sorted.map(([ds,{am}]) => {
-      const dt = new Date(ds+'T00:00:00'), isGold = am.length===total;
-      return `<div class="best-card${isGold?' gold':''}"><div class="best-date-lbl">${dt.getMonth()+1}월 ${dt.getDate()}일 (${DAYS[dt.getDay()]})</div>${slotRow(isGold?'전원 가능':'가능',am,isGold)}</div>`;
+    el.innerHTML = '<div class="best-list">' + sorted.map(([ds, {am}]) => {
+      const dt = new Date(ds+'T00:00:00'), isGold = am.length === total;
+      return `<div class="best-card${isGold?' gold':''}"><div class="best-date-lbl">${dt.getMonth()+1}월 ${dt.getDate()}일 (${DAYS[dt.getDay()]})</div>${slotRow(isGold?'전원 가능':'가능', am, isGold)}</div>`;
     }).join('') + '</div>';
   } else {
-    el.innerHTML = '<div class="best-list">' + sorted.map(([ds,{am,pm}]) => {
-      const dt=new Date(ds+'T00:00:00'), allAM=am.length===total, allPM=pm.length===total, isGold=allAM||allPM;
-      const rows = pm.length>am.length ? slotRow('저녁',pm,allPM)+slotRow('점심',am,allAM) : slotRow('점심',am,allAM)+slotRow('저녁',pm,allPM);
+    el.innerHTML = '<div class="best-list">' + sorted.map(([ds, {am, pm}]) => {
+      const dt = new Date(ds+'T00:00:00'), allAM = am.length===total, allPM = pm.length===total, isGold = allAM||allPM;
+      const rows = pm.length > am.length ? slotRow('저녁',pm,allPM)+slotRow('점심',am,allAM) : slotRow('점심',am,allAM)+slotRow('저녁',pm,allPM);
       return `<div class="best-card${isGold?' gold':''}"><div class="best-date-lbl">${dt.getMonth()+1}월 ${dt.getDate()}일 (${DAYS[dt.getDay()]})</div>${rows}</div>`;
     }).join('') + '</div>';
   }
@@ -781,9 +590,9 @@ function copyShareLink() {
     .catch(() => { const t=Object.assign(document.createElement('textarea'),{value:url}); t.style.cssText='position:fixed;opacity:0'; document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t); toast('링크 복사 완료!'); });
 }
 function toast(msg) {
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.classList.add('show');
-  clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'),3000);
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 3000);
 }
 
 // ── Events ──
@@ -791,29 +600,16 @@ document.getElementById('createBtn').addEventListener('click', createMeeting);
 document.getElementById('shareBtn').addEventListener('click', copyShareLink);
 document.getElementById('backBtn').addEventListener('click', goHome);
 document.getElementById('joinBtn').addEventListener('click', addParticipant);
-document.getElementById('prevM').addEventListener('click', ()=>changeMonth(-1));
-document.getElementById('nextM').addEventListener('click', ()=>changeMonth(1));
-document.getElementById('mtitle').addEventListener('keydown', e=>{ if(e.key==='Enter') createMeeting(); });
-document.getElementById('joinName').addEventListener('keydown', e=>{ if(e.key==='Enter') addParticipant(); });
+document.getElementById('prevM').addEventListener('click', () => changeMonth(-1));
+document.getElementById('nextM').addEventListener('click', () => changeMonth(1));
+document.getElementById('mtitle').addEventListener('keydown', e => { if(e.key==='Enter') createMeeting(); });
+document.getElementById('joinName').addEventListener('keydown', e => { if(e.key==='Enter') addParticipant(); });
 
 // ── Init ──
-sb.auth.onAuthStateChange((_event, session) => {
-  currentUser = session?.user || null;
-  updateAuthBar(currentUser);
-  if (document.getElementById('sHome').classList.contains('on')) renderMeetingList();
-});
-
-(async function() {
-  const { data: { session } } = await sb.auth.getSession();
-  currentUser = session?.user || null;
-  updateAuthBar(currentUser);
+(function() {
   const hash = location.hash.slice(1);
-  if (hash.startsWith('m/')) {
-    if (currentUser) await goMeeting(hash.slice(2));
-    else { goHome(); openAuthModal(); toast('로그인 후 모임에 입장할 수 있어요'); }
-  } else {
-    goHome();
-  }
+  if (hash.startsWith('m/')) goMeeting(hash.slice(2));
+  else goHome();
 })();
 </script>
 </body>
