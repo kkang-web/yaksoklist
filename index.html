@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>약속잡기</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -248,11 +247,21 @@
 <div id="toast"></div>
 
 <script>
-// ── Supabase (약속 데이터 저장용) ──
-const sb = supabase.createClient(
-  'https://dhwlvszqenjgddwtkqjb.supabase.co',
-  'sb_publishable_MwWWiXPTrY8CTqNSUWSDmg_2aBelhit'
-);
+// ── API ──
+async function apiGet(id) {
+  try {
+    const r = await fetch('/api/meeting?id=' + id);
+    if (r.ok) return await r.json();
+  } catch(_) {}
+  return null;
+}
+function apiPost(id, data) {
+  fetch('/api/meeting?id=' + id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(() => {});
+}
 
 // ── State ──
 let liveData    = { title: '', mode: 'date', participants: {} };
@@ -271,10 +280,10 @@ function getMyMeetings() { try { return JSON.parse(localStorage.getItem('yaksok_
 function addMyMeeting(m) { const l = getMyMeetings().filter(x => x.id !== m.id); l.unshift(m); localStorage.setItem('yaksok_admin_v2', JSON.stringify(l)); }
 function removeMyMeeting(id) { localStorage.setItem('yaksok_admin_v2', JSON.stringify(getMyMeetings().filter(x => x.id !== id))); }
 
-// ── Meeting data (Supabase + localStorage cache) ──
-async function saveMeetingData(id, data) {
+// ── Meeting data ──
+function saveMeetingData(id, data) {
   localStorage.setItem('yaksok_data_' + id, JSON.stringify(data));
-  sb.from('meetings').upsert({ id, data }).catch(() => {});
+  apiPost(id, data);
 }
 function localMeetingData(id) {
   try { return JSON.parse(localStorage.getItem('yaksok_data_' + id)) || null; } catch(_) { return null; }
@@ -303,16 +312,17 @@ async function goMeeting(id) {
   document.getElementById('topTitle').textContent  = liveData.title;
   updateAddMineBtn();
   render();
-  try {
-    const { data } = await sb.from('meetings').select('data').eq('id', id).single();
-    if (data && meetingId === id) {
-      liveData = data.data;
+  // 로컬 캐시가 없을 때만 서버에서 불러옴 (캐시가 있으면 덮어쓰지 않음)
+  if (!cached) {
+    const serverData = await apiGet(id);
+    if (serverData && meetingId === id) {
+      liveData = serverData;
       localStorage.setItem('yaksok_data_' + id, JSON.stringify(liveData));
       document.getElementById('topTitle').textContent = liveData.title;
       updateAddMineBtn();
       render();
     }
-  } catch(e) {}
+  }
 }
 
 // ── 약속 생성 ──
@@ -324,9 +334,13 @@ async function createMeeting() {
 
   const id   = genId();
   const data = { title: t, mode: selectedMode, createdAt: Date.now(), participants: {} };
-  const { error } = await sb.from('meetings').insert({ id, data });
+  const r = await fetch('/api/meeting?id=' + id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(() => null);
   btn.textContent = '만들기 →'; btn.disabled = false;
-  if (error) { toast('오류: 잠시 후 다시 시도하세요'); return; }
+  if (!r || !r.ok) { toast('오류: 잠시 후 다시 시도하세요'); return; }
 
   addMyMeeting({ id, title: t, mode: selectedMode, createdAt: Date.now() });
   localStorage.setItem('yaksok_data_' + id, JSON.stringify(data));

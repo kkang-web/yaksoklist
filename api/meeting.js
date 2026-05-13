@@ -1,4 +1,5 @@
-const BLOB = 'https://jsonblob.com/api/jsonBlob';
+const SUPA_URL = 'https://dhwlvszqenjgddwtkqjb.supabase.co';
+const SUPA_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 async function readBody(req) {
   const chunks = [];
@@ -17,35 +18,29 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'GET') {
     if (!id) return res.status(400).json({ error: 'id required' });
-    const r = await fetch(`${BLOB}/${id}`, { headers: { Accept: 'application/json' } });
-    if (!r.ok) return res.status(200).json(null);
-    return res.status(200).json(await r.json());
+    const r = await fetch(`${SUPA_URL}/rest/v1/meetings?id=eq.${id}&select=data`, {
+      headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` }
+    });
+    const rows = await r.json();
+    if (!rows.length) return res.status(200).json(null);
+    return res.status(200).json(rows[0].data);
   }
 
   if (req.method === 'POST') {
     const body = await readBody(req);
-    if (id) {
-      // Update existing blob
-      const r = await fetch(`${BLOB}/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) return res.status(r.status).json({ error: 'update failed' });
-      return res.status(200).json({ ok: true, id });
-    } else {
-      // Create new blob
-      const r = await fetch(BLOB, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!r.ok) return res.status(r.status).json({ error: 'create failed' });
-      const loc = r.headers.get('Location') || '';
-      const blobId = loc.split('/').pop();
-      if (!blobId) return res.status(500).json({ error: 'no blob id' });
-      return res.status(201).json({ ok: true, id: blobId });
-    }
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const r = await fetch(`${SUPA_URL}/rest/v1/meetings`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPA_KEY,
+        Authorization: `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({ id, data: body }),
+    });
+    if (!r.ok) return res.status(r.status).json({ error: await r.text() });
+    return res.status(200).json({ ok: true });
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
