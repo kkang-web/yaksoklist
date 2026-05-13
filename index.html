@@ -461,6 +461,11 @@ function goHome() {
 }
 
 async function goMeeting(id) {
+  if (!currentUser) {
+    openAuthModal();
+    toast('로그인 후 모임에 입장할 수 있어요');
+    return;
+  }
   meetingId   = id;
   selectedPid = null;
   const cached = localMeetingData(id);
@@ -800,8 +805,12 @@ sb.auth.onAuthStateChange((_event, session) => {
   currentUser = session?.user || null;
   updateAuthBar(currentUser);
   const hash = location.hash.slice(1);
-  if (hash.startsWith('m/')) await goMeeting(hash.slice(2));
-  else goHome();
+  if (hash.startsWith('m/')) {
+    if (currentUser) await goMeeting(hash.slice(2));
+    else { goHome(); openAuthModal(); toast('로그인 후 모임에 입장할 수 있어요'); }
+  } else {
+    goHome();
+  }
 })();
 </script>
 </body>
